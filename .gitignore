@@ -20,3 +20,10 @@ flatpak/repo/
 flatpak/.flatpak-builder/
 .flatpak-builder/
 *.flatpak
+
+# libVLC Windows téléchargée par windows/prepare-vlc.ps1 (ne pas versionner)
+composeApp/resources/windows/vlc/
+
+# Journaux et sorties de build
+*.log
+composeApp/release/

@@ -11,7 +11,7 @@ L'utilisateur ajoute ses propres sources :
 | **Xtream Codes** | Serveur, identifiant, mot de passe (ou un lien `get.php?username=…` complet) |
 | **Portail Stalker / Ministra** | URL du portail (`http://hôte:port/c/`) + adresse MAC |
 
-Licence : **GPL v3**. Aucune dépendance propriétaire (Compose, Ktor, Coil, Media3 : Apache 2.0 ; vlcj : GPL v3).
+Licence : **GPL v3**. Aucune dépendance propriétaire (Compose, Ktor, Coil, Media3 : Apache 2.0 ; vlcj, décodeur FFmpeg Jellyfin : GPL v3).
 
 ## Architecture
 
@@ -108,13 +108,24 @@ Fichiers : `flatpak/app.souffly.SoufflyTV.yml` (manifeste), `.desktop`, `.metain
 Données de l'app : `~/.var/app/app.souffly.SoufflyTV/data/soufflytv/`.
 
 ### Windows
-Installer VLC 3 (64 bits), puis :
-```bat
-gradlew.bat :composeApp:run
-gradlew.bat :composeApp:packageMsi
+
+L'installeur embarque **libVLC** (VLC 3, 64 bits) : rien d'autre à installer. Installation pour
+l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le menu Démarrer.
+
+**Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
+```bash
+git tag v0.5.3 && git push origin v0.5.3
 ```
-Sans PC Windows : le workflow GitHub Actions (`.github/workflows/build.yml`) construit l'APK,
-le .deb/.rpm et le .msi/.exe à chaque push. Les fichiers sont dans l'onglet **Actions → Artifacts**.
+→ une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
+(signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
+Le workflow peut aussi être lancé à la main (onglet Actions → Release → Run workflow).
+
+**Sur un PC Windows** (JDK 21 : `winget install EclipseAdoptium.Temurin.21.JDK`, et Android Studio
+ou le SDK Android, car le projet contient aussi l'app Android) :
+```bat
+powershell -ExecutionPolicy Bypass -File windows\build-windows.ps1
+```
+→ `composeApp\build\compose\binaries\main\msi\` et `exe\`.
 
 ## Utilisation
 
@@ -163,6 +174,7 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
 **Lecteur**
 - [x] Commandes par-dessus l'image, masquées après 5 s (Android)
 - [x] Pause, barre de progression utilisable à la télécommande, sauts −10 min / −1 min / −10 s / +10 s / +1 min / +10 min, épisode précédent/suivant, **épisode suivant automatique**
+- [x] **Son Dolby (AC3, E-AC3), DTS, TrueHD** sur tous les appareils Android (décodeur FFmpeg en secours de ceux de l'appareil)
 - [x] Choix de la **piste audio** et des **sous-titres**, **format d'image** (Original, 16:9, Zoom)
 - [x] **Image dans l'image** (bouton ou touche Accueil), paysage automatique, écran toujours allumé
 - [x] **Reconnexion automatique** du direct (3 essais), mémoire tampon réglable
@@ -170,8 +182,7 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
 **Réglages** : démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
 masquage des catégories adultes, effacement de l'historique.
 
-**À venir** : grille du guide TV sur plusieurs heures, contrôle parental par code,
-paquet Flatpak avec libVLC intégrée.
+**À venir** : grille du guide TV sur plusieurs heures, contrôle parental par code.
 
 ## Avertissement
 
