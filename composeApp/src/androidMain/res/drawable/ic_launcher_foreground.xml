@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Téléviseur cyan façon CyanogenMod, dans la zone sûre de l'icône adaptative -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M46,30L54,38L62,30"
+        android:strokeWidth="3"
+        android:strokeColor="#00D4EC"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#0B1115"
+        android:pathData="M33,38H75A5,5 0 0,1 80,43V67A5,5 0 0,1 75,72H33A5,5 0 0,1 28,67V43A5,5 0 0,1 33,38Z"
+        android:strokeWidth="4"
+        android:strokeColor="#00D4EC" />
+    <path
+        android:fillColor="#00D4EC"
+        android:pathData="M49,47V63L63,55Z" />
+    <path
+        android:pathData="M44,79H64"
+        android:strokeWidth="4"
+        android:strokeColor="#00D4EC"
+        android:strokeLineCap="round" />
+</vector>

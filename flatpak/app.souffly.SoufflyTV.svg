@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Icône SoufflyTV : téléviseur cyan façon CyanogenMod sur fond noir -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#05080A"/>
+  <rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#00D4EC" stroke-opacity="0.35"/>
+  <path d="M52 30 L64 42 L76 30" fill="none" stroke="#00D4EC" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="24" y="42" width="80" height="52" rx="9" fill="#0B1115" stroke="#00D4EC" stroke-width="5.5"/>
+  <path d="M56 56 V80 L76 68 Z" fill="#00D4EC"/>
+  <path d="M50 106 H78" stroke="#00D4EC" stroke-width="5.5" stroke-linecap="round"/>
+</svg>

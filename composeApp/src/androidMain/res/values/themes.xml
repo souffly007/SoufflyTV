@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="cm_background">#05080A</color>
+    <color name="cm_cyan">#00D4EC</color>
+
+    <style name="Theme.SoufflyTV" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/cm_background</item>
+        <item name="android:colorAccent">@color/cm_cyan</item>
+    </style>
+</resources>

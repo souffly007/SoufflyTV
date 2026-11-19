@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bannière du lanceur Android TV (320 × 180) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#05080A"
+        android:pathData="M0,0H320V180H0Z" />
+    <path
+        android:fillColor="#00D4EC"
+        android:pathData="M0,176H320V180H0Z" />
+    <path
+        android:pathData="M148,46L160,58L172,46"
+        android:strokeWidth="4"
+        android:strokeColor="#00D4EC"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#0B1115"
+        android:pathData="M124,58H196A8,8 0 0,1 204,66V112A8,8 0 0,1 196,120H124A8,8 0 0,1 116,112V66A8,8 0 0,1 124,58Z"
+        android:strokeWidth="5"
+        android:strokeColor="#00D4EC" />
+    <path
+        android:fillColor="#00D4EC"
+        android:pathData="M151,73V105L177,89Z" />
+    <path
+        android:pathData="M144,136H176"
+        android:strokeWidth="5"
+        android:strokeColor="#00D4EC"
+        android:strokeLineCap="round" />
+</vector>

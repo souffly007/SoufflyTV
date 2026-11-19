@@ -1,0 +1,530 @@
+package fr.bonobo.soufflytv.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import fr.bonobo.soufflytv.AppState
+import fr.bonobo.soufflytv.Screen
+import androidx.compose.material3.TextButton
+import fr.bonobo.soufflytv.data.detail
+import fr.bonobo.soufflytv.data.kindLabel
+import fr.bonobo.soufflytv.model.Channel
+import fr.bonobo.soufflytv.model.ItemType
+import fr.bonobo.soufflytv.model.Programme
+import fr.bonobo.soufflytv.model.Section
+import fr.bonobo.soufflytv.model.Source
+import fr.bonobo.soufflytv.platform.formatClock
+import fr.bonobo.soufflytv.platform.isTvBuild
+import fr.bonobo.soufflytv.platform.nowMillis
+import fr.bonobo.soufflytv.ui.theme.Cm
+import fr.bonobo.soufflytv.ui.theme.MonoLabel
+import kotlinx.coroutines.delay
+
+@Composable
+fun BrowserScreen(state: AppState, source: Source) {
+    val model = remember(source) { state.browser(source) }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = isTvBuild || maxWidth >= 720.dp
+        SideEffect { model.wide = wide }
+        LaunchedEffect(model) { model.start() }
+
+        val manage = { state.navigate(Screen.ManageCategories(source, model.section)) }
+
+        Column(Modifier.fillMaxSize()) {
+            if (wide) {
+                // Grand écran : une seule barre (logo, rubriques, compte, filtres, réglages)
+                TopNavBar(
+                    source = source,
+                    model = model,
+                    onHome = { state.home() },
+                    onManage = manage,
+                    onSettings = { state.navigate(Screen.Settings) },
+                )
+            } else {
+                TopBar(
+                    title = source.name,
+                    subtitle = "${source.kindLabel} · ${source.detail}",
+                    onBack = { state.back() },
+                    actions = {
+                        if (model.loadedOnce) {
+                            TextButtonIcon(
+                                label = if (model.hiddenCount > 0) "Catégories (${model.hiddenCount} masquées)" else "Catégories",
+                                showLabel = false,
+                                onClick = manage,
+                            )
+                        }
+                    },
+                )
+                if (model.sections.size > 1) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        model.sections.forEach { s ->
+                            Pill(s.label, selected = s == model.section) { model.selectSection(s) }
+                        }
+                    }
+                }
+            }
+
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                val error = model.error
+                when {
+                    model.categoriesLoading && !model.loadedOnce -> LoadingBox("Connexion à la source…")
+                    error != null && !model.loadedOnce -> ErrorBox(error, onRetry = model::retry)
+                    wide -> Row(Modifier.fillMaxSize()) {
+                        CategoryPane(model, Modifier.width(240.dp).fillMaxHeight())
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(Cm.Outline))
+                        ChannelPane(state, source, model, Modifier.weight(1f).fillMaxHeight(), showBack = false, wide = true)
+                    }
+                    model.showChannels -> ChannelPane(state, source, model, Modifier.fillMaxSize(), showBack = true, wide = false)
+                    else -> CategoryPane(model, Modifier.fillMaxSize())
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Barre du haut, esprit Souffly : SoufflyTV · Accueil · TV · Films · Séries … compte · Filtres · Réglages.
+ * À la télécommande : flèche haut depuis les catégories pour l'atteindre.
+ */
+@Composable
+private fun TopNavBar(
+    source: Source,
+    model: BrowserModel,
+    onHome: () -> Unit,
+    onManage: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("Souffly", color = Cm.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("TV", color = Cm.Cyan, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(24.dp))
+            NavTab(AppIcons.Home, "Accueil", selected = false, onClick = onHome)
+            model.sections.forEach { s ->
+                val (icon, label) = when (s) {
+                    Section.LIVE -> AppIcons.Tv to "TV"
+                    Section.MOVIES -> AppIcons.Movie to "Films"
+                    Section.SERIES -> AppIcons.Library to "Séries"
+                }
+                NavTab(icon, label, selected = s == model.section) { model.selectSection(s) }
+            }
+            Spacer(Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 12.dp)) {
+                Text(source.name, color = Cm.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Text(source.kindLabel, style = MonoLabel, color = Cm.TextMuted)
+            }
+            NavTab(
+                AppIcons.Filter,
+                if (model.hiddenCount > 0) "Filtres (${model.hiddenCount})" else "Filtres",
+                selected = false,
+                onClick = onManage,
+            )
+            NavTab(AppIcons.Settings, null, selected = false, onClick = onSettings)
+        }
+        CyanLine()
+    }
+}
+
+@Composable
+private fun NavTab(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        Modifier.padding(horizontal = 3.dp).tvClickable(selected = selected, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                icon,
+                contentDescription = label ?: "Réglages",
+                tint = if (selected) Cm.Cyan else Cm.TextMuted,
+                modifier = Modifier.size(20.dp),
+            )
+            if (label != null) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    label,
+                    color = if (selected) Cm.Cyan else Cm.Text,
+                    fontSize = 15.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                )
+            }
+        }
+        // Soulignement cyan de la rubrique active
+        Box(
+            Modifier.width(28.dp).height(3.dp)
+                .background(if (selected) Cm.Cyan else Color.Transparent, RoundedCornerShape(2.dp))
+        )
+    }
+}
+
+@Composable
+private fun CategoryPane(model: BrowserModel, modifier: Modifier) {
+    val selectedFocus = remember { FocusRequester() }
+    var selectedFocused by remember { mutableStateOf(false) }
+    val listState = model.categoryListState
+    val selectedId = model.selected?.id
+
+    // Télécommande : à l'ouverture et au retour du lecteur, le focus va sur la catégorie choisie
+    KeepFocus(
+        selectedFocus, selectedId, model.loadedOnce,
+        isFocused = { selectedFocused || selectedId == null },
+        prepare = {
+            val item = model.categories.indexOfFirst { it.id == selectedId } + 1 // ligne 0 : en-tête
+            if (item > 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == item }) {
+                listState.scrollToItem((item - 3).coerceAtLeast(0))
+            }
+        },
+    )
+
+    LazyColumn(modifier, state = listState, contentPadding = PaddingValues(8.dp)) {
+        item {
+            Text(
+                "CATÉGORIES · ${model.providerCategoryCount.coerceAtLeast(0)}",
+                style = MonoLabel,
+                color = Cm.TextMuted,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+        items(model.categories) { category ->
+            val selected = category.id == model.selected?.id
+            val icon = when (category.id) {
+                FAVORITES -> AppIcons.Star
+                RECENTS -> AppIcons.History
+                else -> null
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 1.dp)
+                    .then(
+                        if (selected) {
+                            Modifier.focusRequester(selectedFocus).onFocusChanged { selectedFocused = it.isFocused }
+                        } else Modifier
+                    )
+                    .tvClickable(selected = selected) { model.select(category) }
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(width = 3.dp, height = 18.dp)
+                        .background(if (selected) Cm.Cyan else Color.Transparent, RoundedCornerShape(2.dp))
+                )
+                Spacer(Modifier.width(10.dp))
+                if (icon != null) {
+                    Icon(icon, contentDescription = null, tint = Cm.Cyan, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    category.name,
+                    color = if (selected) Cm.Cyan else Cm.Text,
+                    fontSize = 14.sp,
+                    fontWeight = if (selected || icon != null) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, modifier: Modifier, showBack: Boolean, wide: Boolean) {
+    val category = model.selected
+    val filtered by remember(model) { derivedStateOf { model.visibleChannels() } }
+    val error = model.error
+    val posters = model.section != Section.LIVE
+    val unit = when (model.section) {
+        Section.LIVE -> "chaîne(s)"
+        Section.MOVIES -> "film(s)"
+        Section.SERIES -> "élément(s)"
+    }
+    val showEpg = model.section == Section.LIVE && model.provider.hasLocalEpg && state.settings.value.epgInLists
+
+    // Rafraîchit l'émission en cours affichée dans la liste
+    var clock by remember { mutableLongStateOf(nowMillis()) }
+    LaunchedEffect(showEpg) {
+        while (showEpg) {
+            delay(60_000)
+            clock = nowMillis()
+        }
+    }
+
+    Column(modifier) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 6.dp, end = 12.dp, top = 8.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (showBack) {
+                IconButton(onClick = { model.showChannels = false }) {
+                    Icon(AppIcons.Back, contentDescription = "Catégories", tint = Cm.Text)
+                }
+            } else {
+                Spacer(Modifier.width(6.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    category?.name ?: "Aucune catégorie",
+                    color = Cm.Text,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (category != null && !model.channelsLoading) {
+                    Text("${filtered.size} $unit", style = MonoLabel, color = Cm.TextMuted)
+                }
+            }
+            // Grand écran : la recherche tient sur la ligne du titre
+            if (wide && category != null) {
+                SearchField(
+                    value = model.query,
+                    onValueChange = { model.query = it },
+                    placeholder = "Rechercher",
+                    modifier = Modifier.width(340.dp),
+                )
+            }
+        }
+
+        if (!wide && category != null) {
+            SearchField(
+                value = model.query,
+                onValueChange = { model.query = it },
+                placeholder = "Rechercher",
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            )
+            Spacer(Modifier.height(6.dp))
+        }
+
+        when {
+            category == null -> EmptyHint("Choisis une catégorie")
+            model.channelsLoading -> LoadingBox("Chargement de la liste…")
+            error != null -> ErrorBox(error, onRetry = model::retry)
+            filtered.isEmpty() -> EmptyHint(
+                when {
+                    model.query.isNotBlank() -> "Aucun résultat"
+                    category.id == FAVORITES -> if (posters) "Aucun favori.\nAppui long sur une affiche pour l'ajouter."
+                    else "Aucun favori.\nTouche l'étoile d'une chaîne pour l'ajouter."
+                    category.id == RECENTS -> "Rien regardé récemment"
+                    else -> "Cette catégorie est vide"
+                }
+            )
+            posters -> LazyVerticalGrid(
+                columns = GridCells.Adaptive(128.dp),
+                state = model.posterGridState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(8.dp),
+            ) {
+                itemsIndexed(filtered) { index, item ->
+                    PosterCard(
+                        item,
+                        favorite = model.isFavorite(item),
+                        onClick = { state.openItem(source, filtered, index) },
+                        onLongClick = { model.toggleFavorite(item) },
+                    )
+                }
+            }
+            else -> LazyColumn(Modifier.fillMaxSize(), state = model.channelListState, contentPadding = PaddingValues(8.dp)) {
+                itemsIndexed(filtered) { index, channel ->
+                    val now = if (showEpg) remember(channel.id, model.epgVersion, clock) { model.provider.epgNow(channel) } else null
+                    ChannelRow(
+                        channel,
+                        index,
+                        favorite = model.isFavorite(channel),
+                        now = now,
+                        clock = clock,
+                        onClick = { state.openItem(source, filtered, index) },
+                        onToggleFavorite = { model.toggleFavorite(channel) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelRow(
+    channel: Channel,
+    index: Int,
+    favorite: Boolean,
+    now: Programme?,
+    clock: Long,
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.dp)
+            .tvClickable(onClick = onClick, onLongClick = onToggleFavorite)
+            .padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            (channel.number ?: (index + 1)).toString(),
+            style = MonoLabel,
+            color = Cm.TextMuted,
+            modifier = Modifier.width(44.dp),
+            maxLines = 1,
+        )
+        ChannelLogo(channel.logo, channel.name, 40.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(channel.name, color = Cm.Text, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (now != null) {
+                Text(
+                    "${formatClock(now.start)} · ${now.title}",
+                    color = Cm.TextMuted,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(3.dp))
+                LinearProgressIndicator(
+                    progress = { now.progress(clock) },
+                    modifier = Modifier.fillMaxWidth(0.6f).height(2.dp),
+                    color = Cm.Cyan,
+                    trackColor = Cm.Outline,
+                )
+            }
+        }
+        IconButton(onClick = onToggleFavorite) {
+            Icon(
+                if (favorite) AppIcons.Star else AppIcons.StarBorder,
+                contentDescription = if (favorite) "Retirer des favoris" else "Ajouter aux favoris",
+                tint = if (favorite) Cm.Cyan else Cm.TextMuted.copy(alpha = 0.6f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosterCard(item: Channel, favorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+    var loaded by remember(item.logo) { mutableStateOf(false) }
+    Column(Modifier.padding(4.dp).tvClickable(onClick = onClick, onLongClick = onLongClick).padding(6.dp)) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Cm.SurfaceHigher),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (!loaded) {
+                Text(
+                    item.name,
+                    color = Cm.TextMuted,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 4,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+            if (item.logo != null) {
+                AsyncImage(
+                    model = item.logo,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    onSuccess = { loaded = true },
+                )
+            }
+            if (favorite) {
+                Box(
+                    Modifier.align(Alignment.TopEnd).padding(6.dp).size(26.dp)
+                        .background(Cm.Background.copy(alpha = 0.7f), RoundedCornerShape(13.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AppIcons.Star, contentDescription = "Favori", tint = Cm.Cyan, modifier = Modifier.size(16.dp))
+                }
+            }
+            if (item.type == ItemType.SERIES) {
+                Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) { TypeBadge("SÉRIE") }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            item.name,
+            color = Cm.Text,
+            fontSize = 13.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.height(36.dp),
+        )
+    }
+}
+
+/** Bouton « filtre » de la barre du haut, avec son libellé sur grand écran. */
+@Composable
+private fun TextButtonIcon(label: String, showLabel: Boolean, onClick: () -> Unit) {
+    if (showLabel) {
+        TextButton(onClick = onClick) {
+            Icon(AppIcons.Filter, contentDescription = null, tint = Cm.Cyan, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(label, color = Cm.Cyan, fontSize = 14.sp)
+        }
+    } else {
+        IconButton(onClick = onClick) {
+            Icon(AppIcons.Filter, contentDescription = label, tint = Cm.Cyan)
+        }
+    }
+}

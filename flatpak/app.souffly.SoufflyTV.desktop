@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SoufflyTV
+GenericName=Lecteur IPTV
+Comment=Lecteur IPTV libre : playlists M3U, Xtream Codes, portails Stalker
+Exec=soufflytv
+Icon=app.souffly.SoufflyTV
+Terminal=false
+Categories=AudioVideo;Video;Player;TV;
+Keywords=iptv;tv;télévision;m3u;xtream;stalker;mac;epg;
+StartupWMClass=fr-bonobo-soufflytv-MainKt

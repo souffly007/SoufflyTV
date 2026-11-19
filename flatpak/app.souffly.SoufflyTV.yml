@@ -1,0 +1,192 @@
+# Flatpak de SoufflyTV (version ordinateur) — GPL v3
+#
+# Contenu :
+#  - FFmpeg (tous les décodeurs libres : H.264, HEVC, AAC, AC3…)
+#  - libdvbpsi + libebml/libmatroska (flux TS de l'IPTV, films MKV)
+#  - libVLC 3 (sans l'interface VLC) utilisée par vlcj
+#  - l'application SoufflyTV construite par Gradle (createDistributable, Java embarqué)
+#
+# Construction : voir build-flatpak.sh et la section Flatpak du README.
+
+app-id: app.souffly.SoufflyTV
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: soufflytv
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  # Interface Java (AWT) et vidéo libVLC intégrée : X11 (XWayland sous Plasma Wayland)
+  - --socket=x11
+  - --socket=pulseaudio
+  - --device=dri
+  # Import d'une playlist M3U depuis Téléchargements ou Documents (lecture seule)
+  - --filesystem=xdg-download:ro
+  - --filesystem=xdg-documents:ro
+  # Où vlcj et libVLC trouvent la bibliothèque et ses modules
+  - --env=SOUFFLYTV_VLC_DIR=/app/lib
+  - --env=VLC_PLUGIN_PATH=/app/lib/vlc/plugins
+  - --env=JAVA_TOOL_OPTIONS=-Djna.library.path=/app/lib
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/man
+  - /share/doc
+  - /share/aclocal
+  - '*.la'
+  - '*.a'
+
+modules:
+
+  # ---------- FFmpeg : décodeurs vidéo et audio ----------
+  - name: ffmpeg
+    config-opts:
+      - --enable-shared
+      - --disable-static
+      - --enable-gpl
+      - --enable-version3
+      - --disable-programs
+      - --disable-doc
+      - --disable-debug
+      - --enable-vaapi
+    sources:
+      - type: archive
+        url: https://ffmpeg.org/releases/ffmpeg-6.1.2.tar.xz
+        sha256: 3b624649725ecdc565c903ca6643d41f33bd49239922e45c9b1442c63dca4e38
+
+  # ---------- libdvbpsi : démultiplexeur TS (flux IPTV) ----------
+  - name: libdvbpsi
+    config-opts:
+      - --disable-static
+    sources:
+      - type: archive
+        url: https://download.videolan.org/pub/libdvbpsi/1.3.3/libdvbpsi-1.3.3.tar.bz2
+        sha256: 02b5998bcf289cdfbd8757bedd5987e681309b0a25b3ffe6cebae599f7a00112
+
+  # ---------- libebml + libmatroska : fichiers MKV (films, séries) ----------
+  - name: libebml
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DBUILD_SHARED_LIBS=ON
+      - -DCMAKE_BUILD_TYPE=Release
+      # CMake 4 (SDK Flatpak) refuse les projets déclarés pour CMake < 3.5
+      - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    sources:
+      - type: archive
+        url: https://dl.matroska.org/downloads/libebml/libebml-1.4.5.tar.xz
+        sha256: 4971640b0592da29c2d426f303e137a9b0b3d07e1b81d069c1e56a2f49ab221b
+
+  - name: libmatroska
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DBUILD_SHARED_LIBS=ON
+      - -DCMAKE_BUILD_TYPE=Release
+      # CMake 4 (SDK Flatpak) refuse les projets déclarés pour CMake < 3.5
+      - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    sources:
+      - type: archive
+        url: https://dl.matroska.org/downloads/libmatroska/libmatroska-1.7.1.tar.xz
+        sha256: 572a3033b8d93d48a6a858e514abce4b2f7a946fe1f02cbfeca39bfd703018b3
+
+  # ---------- libVLC 3 (sans l'interface de VLC) ----------
+  - name: vlc
+    build-options:
+      # GCC 14 transforme d'anciens avertissements en erreurs : on les garde en avertissements
+      cflags: -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration -Wno-error=int-conversion
+    config-opts:
+      - --disable-vlc
+      # compilateur pour les petits outils que VLC génère pendant sa compilation
+      - BUILDCC=/usr/bin/gcc -std=gnu11
+      - --disable-qt
+      - --disable-skins2
+      - --disable-lua
+      - --disable-a52
+      - --disable-mad
+      - --disable-libmpeg2
+      - --disable-chromecast
+      - --disable-srt
+      - --disable-update-check
+      - --disable-nls
+      - --disable-avahi
+      - --disable-upnp
+      # Modules inutiles pour SoufflyTV (et souvent incompatibles avec les bibliothèques récentes)
+      - --disable-notify
+      - --disable-libplacebo
+      - --disable-gst-decode
+      - --disable-taglib
+      - --disable-svg
+      - --disable-svgdec
+      - --disable-ncurses
+      - --disable-caca
+      - --disable-wayland
+      - --disable-kwallet
+      - --disable-secret
+      - --disable-dbus
+      - --disable-jack
+      - --disable-goom
+      - --disable-projectm
+      - --disable-vsxu
+      - --disable-smbclient
+      - --disable-dsm
+      - --disable-nfs
+      - --disable-sftp
+      - --disable-mtp
+      - --disable-bluray
+      - --disable-dvdread
+      - --disable-dvdnav
+      - --disable-x264
+      - --disable-x26410b
+      - --disable-x265
+      - --disable-fluidsynth
+      - --disable-sdl-image
+      - --disable-zvbi
+      - --disable-aribsub
+      - --disable-microdns
+      - --disable-sid
+      - --disable-gme
+      - --disable-shout
+      - --disable-mod
+      - --disable-mpc
+      - --disable-crystalhd
+      - --disable-opencv
+      - --disable-freerdp
+      - --disable-vnc
+      - --disable-archive
+      # L'essentiel pour l'IPTV
+      - --enable-avcodec
+      - --enable-avformat
+      - --enable-swscale
+      - --enable-dvbpsi
+      - --enable-mkv
+    post-install:
+      # cache des modules : démarrage plus rapide de libVLC
+      - sh -c "[ -x /app/lib/vlc/vlc-cache-gen ] && /app/lib/vlc/vlc-cache-gen /app/lib/vlc/plugins || true"
+    sources:
+      - type: archive
+        url: https://download.videolan.org/pub/videolan/vlc/3.0.21/vlc-3.0.21.tar.xz
+        sha256: 24dbbe1d7dfaeea0994d5def0bbde200177347136dbfe573f5b6a4cee25afbb0
+
+  # ---------- SoufflyTV ----------
+  # Construit au préalable par : ./gradlew :composeApp:createDistributable
+  - name: soufflytv
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/soufflytv
+      - cp -a SoufflyTV/. /app/soufflytv/
+      - install -Dm755 soufflytv.sh /app/bin/soufflytv
+      - install -Dm644 app.souffly.SoufflyTV.desktop /app/share/applications/app.souffly.SoufflyTV.desktop
+      - install -Dm644 app.souffly.SoufflyTV.svg /app/share/icons/hicolor/scalable/apps/app.souffly.SoufflyTV.svg
+      - install -Dm644 app.souffly.SoufflyTV.metainfo.xml /app/share/metainfo/app.souffly.SoufflyTV.metainfo.xml
+    sources:
+      - type: dir
+        path: ../composeApp/build/compose/binaries/main/app
+      - type: file
+        path: soufflytv.sh
+      - type: file
+        path: app.souffly.SoufflyTV.desktop
+      - type: file
+        path: app.souffly.SoufflyTV.svg
+      - type: file
+        path: app.souffly.SoufflyTV.metainfo.xml

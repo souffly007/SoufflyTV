@@ -1,0 +1,22 @@
+*.iml
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+.DS_Store
+captures/
+*.apk
+*.aab
+
+# Signature : ne jamais publier la clé ni ses mots de passe
+keystore.properties
+*.jks
+*.keystore
+
+# Flatpak
+flatpak/build/
+flatpak/repo/
+flatpak/.flatpak-builder/
+.flatpak-builder/
+*.flatpak
