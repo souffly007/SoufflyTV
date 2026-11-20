@@ -72,6 +72,15 @@ import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
 
 @Composable
 fun BrowserScreen(state: AppState, source: Source) {
@@ -246,7 +255,14 @@ private fun CategoryPane(model: BrowserModel, modifier: Modifier) {
         },
     )
 
-    LazyColumn(modifier, state = listState, contentPadding = PaddingValues(8.dp)) {
+    LazyColumn(
+        modifier.onPreviewKeyEvent { event ->
+            event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight &&
+                model.enterPosters?.invoke() == true
+        },
+        state = listState,
+        contentPadding = PaddingValues(8.dp),
+    ) {
         item {
             Text(
                 "CATÉGORIES · ${model.providerCategoryCount.coerceAtLeast(0)}",
@@ -392,6 +408,24 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
                 }
             )
             posters -> {
+                // ▶ depuis les catégories : on entre sur l'affiche du bandeau (ou la première)
+                val entryRequester = remember { FocusRequester() }
+                val entryId = (hero ?: model.heroItem?.takeIf { h -> filtered.any { it.id == h.id } } ?: filtered.first()).id
+                val scope = rememberCoroutineScope()
+                DisposableEffect(model, entryId, filtered) {
+                    model.enterPosters = {
+                        val target = filtered.indexOfFirst { it.id == entryId }.coerceAtLeast(0)
+                        scope.launch {
+                            val grid = model.posterGridState
+                            if (grid.layoutInfo.visibleItemsInfo.none { it.index == target }) grid.scrollToItem(target)
+                            withFrameNanos { }
+                            runCatching { entryRequester.requestFocus() }
+                        }
+                        true
+                    }
+                    onDispose { model.enterPosters = null }
+                }
+
                 // Retour d'une fiche ou du lecteur : le focus revient sur l'affiche ouverte
                 val posterFocus = remember { FocusRequester() }
                 var posterFocused by remember { mutableStateOf(false) }
@@ -417,9 +451,13 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
                         PosterCard(
                             item,
                             favorite = model.isFavorite(item),
-                            focusModifier = if (item.id == returnId) {
-                                Modifier.focusRequester(posterFocus).onFocusChanged { posterFocused = it.isFocused }
-                            } else Modifier,
+                            focusModifier = Modifier
+                                .then(if (item.id == entryId) Modifier.focusRequester(entryRequester) else Modifier)
+                                .then(
+                                    if (item.id == returnId) {
+                                        Modifier.focusRequester(posterFocus).onFocusChanged { posterFocused = it.isFocused }
+                                    } else Modifier
+                                ),
                             onFocused = { model.focusPoster(item, index) },
                             onClick = {
                                 model.returnFocusId = item.id

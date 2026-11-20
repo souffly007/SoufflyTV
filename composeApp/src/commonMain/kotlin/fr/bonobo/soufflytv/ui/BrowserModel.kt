@@ -82,6 +82,13 @@ class BrowserModel(
     var returnFocusId by mutableStateOf<String?>(null)
     private val details = HashMap<String, MovieInfo>()
 
+    /**
+     * ▶ depuis la colonne des catégories : va sur l'affiche présentée dans le bandeau.
+     * (Le bandeau occupe le haut : sans cela, ▶ partait vers les onglets du menu.)
+     * Fourni par la grille quand elle est affichée ; renvoie true si la touche est prise en charge.
+     */
+    var enterPosters: (() -> Boolean)? = null
+
     fun focusPoster(item: Channel, index: Int) {
         heroItem = item
         heroIndex = index

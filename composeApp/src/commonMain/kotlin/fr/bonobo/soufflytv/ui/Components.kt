@@ -73,6 +73,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import fr.bonobo.soufflytv.platform.isAndroid
 import fr.bonobo.soufflytv.platform.isTvBuild
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.layout.widthIn
 import coil3.compose.AsyncImage
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
@@ -222,6 +226,41 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: Str
     )
 }
 
+/** Bandeau en haut de l'écran, au-dessus de tout, qui montre le texte en cours de saisie. */
+@Composable
+private fun TypingPreview(label: String, text: String) {
+    val offsetY = with(LocalDensity.current) { 28.dp.roundToPx() }
+    Popup(
+        alignment = Alignment.TopCenter,
+        offset = IntOffset(0, offsetY),
+        properties = PopupProperties(focusable = false),
+    ) {
+        val shape = RoundedCornerShape(14.dp)
+        Column(
+            Modifier
+                .widthIn(min = 420.dp, max = 760.dp)
+                .background(Cm.SurfaceHigh, shape)
+                .border(2.dp, Cm.Cyan, shape)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+        ) {
+            Text(label, color = Cm.TextMuted, fontSize = 13.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text,
+                    color = Cm.Text,
+                    fontSize = 24.sp,
+                    maxLines = 1,
+                    // texte long : on montre la fin, là où l'on tape
+                    overflow = TextOverflow.StartEllipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                // curseur
+                Box(Modifier.padding(start = 2.dp).width(2.dp).height(26.dp).background(Cm.Cyan))
+            }
+        }
+    }
+}
+
 /** Télécommande (Android TV, box, clavier sur Android) : les champs ne s'ouvrent que sur OK. */
 @Composable
 fun remoteTextInput(): Boolean = remoteNavigation()
@@ -328,6 +367,11 @@ fun RemoteTextField(
             delay(100)
             keyboard?.show()
         }
+        // Le clavier de la TV recouvre souvent le champ : ce qu'on tape s'affiche en haut de l'écran
+        TypingPreview(
+            label = label ?: placeholder.ifEmpty { "Saisie" },
+            text = if (hidden) "•".repeat(value.length) else value,
+        )
         // Clavier refermé (Retour) : la saisie se termine, le focus reste sur la case
         val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
         var imeShown by remember { mutableStateOf(false) }
