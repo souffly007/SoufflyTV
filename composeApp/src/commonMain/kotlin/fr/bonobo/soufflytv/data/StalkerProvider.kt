@@ -3,6 +3,7 @@ package fr.bonobo.soufflytv.data
 import fr.bonobo.soufflytv.model.Category
 import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.ItemType
+import fr.bonobo.soufflytv.model.MovieInfo
 import fr.bonobo.soufflytv.model.Programme
 import fr.bonobo.soufflytv.model.Season
 import fr.bonobo.soufflytv.model.Section
@@ -57,6 +58,8 @@ class StalkerProvider(
     private var seriesModule: Boolean? = null
     private var allChannels: List<Channel>? = null
     private val vodCache = HashMap<String, List<Channel>>()
+    /** Fiches des films, remplies en lisant les listes (le portail y donne déjà tout). */
+    private val movieInfos = HashMap<String, MovieInfo>()
     private val seriesCache = HashMap<String, List<Channel>>()
     private val seriesInfoCache = HashMap<String, SeriesInfo>()
     private val epgCache = HashMap<String, Pair<Long, List<Programme>>>()
@@ -265,7 +268,7 @@ class StalkerProvider(
             if (isSeriesItem(o)) return@mapNotNull seriesChannel(o, module = false)
             val id = o.s("id") ?: return@mapNotNull null
             val cmd = o.s("cmd") ?: return@mapNotNull null
-            Channel(
+            val channel = Channel(
                 id = "stk-vod-$id",
                 name = o.s("name") ?: "Film $id",
                 logo = logoUrl(o.s("screenshot_uri")),
@@ -273,11 +276,24 @@ class StalkerProvider(
                 stream = cmd,
                 type = ItemType.MOVIE,
                 plot = o.s("description"),
+                rating = o.s("rating_imdb"),
             )
+            movieInfos[channel.id] = MovieInfo(
+                name = channel.name,
+                plot = channel.plot,
+                cover = channel.logo,
+                meta = movieMetaLine(o.s("year"), o.s("genres_str"), o.s("time")?.toIntOrNull(), o.s("rating_imdb")),
+                director = o.s("director")?.takeIf { it.isNotBlank() },
+                cast = o.s("actors")?.takeIf { it.isNotBlank() },
+            )
+            channel
         }
         vodCache[category] = list
         return list
     }
+
+    override suspend fun movieInfo(movie: Channel): MovieInfo =
+        movieInfos[movie.id] ?: MovieInfo(movie.name, movie.plot, movie.logo)
 
     // ---------- Séries ----------
 

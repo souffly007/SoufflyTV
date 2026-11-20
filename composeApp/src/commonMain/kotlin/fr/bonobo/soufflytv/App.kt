@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import fr.bonobo.soufflytv.ui.AddSourceScreen
 import fr.bonobo.soufflytv.ui.BrowserScreen
 import fr.bonobo.soufflytv.ui.ManageCategoriesScreen
+import fr.bonobo.soufflytv.ui.MovieScreen
 import fr.bonobo.soufflytv.ui.PlayerScreen
 import fr.bonobo.soufflytv.ui.SeriesScreen
 import fr.bonobo.soufflytv.ui.SettingsScreen
@@ -31,6 +32,7 @@ fun App(state: AppState) {
                         Screen.Settings -> SettingsScreen(state)
                         is Screen.Browse -> BrowserScreen(state, screen.source)
                         is Screen.Series -> SeriesScreen(state, screen.source, screen.series)
+                        is Screen.Movie -> MovieScreen(state, screen.source, screen.channels, screen.index)
                         is Screen.ManageCategories -> ManageCategoriesScreen(state, screen.source, screen.section)
                         is Screen.Player -> Unit
                     }

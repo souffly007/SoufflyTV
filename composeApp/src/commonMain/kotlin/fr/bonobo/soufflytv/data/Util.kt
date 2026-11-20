@@ -156,3 +156,41 @@ fun Throwable.toUserMessage(): String = when (this) {
         }
     }
 }
+
+/** 117 → « 1 h 57 », 45 → « 45 min ». */
+fun runtimeLabel(totalMinutes: Int): String? = when {
+    totalMinutes <= 0 -> null
+    totalMinutes < 60 -> "$totalMinutes min"
+    else -> "${totalMinutes / 60} h ${(totalMinutes % 60).toString().padStart(2, '0')}"
+}
+
+/** Durée Xtream « 01:57:10 » ou « 117 » (minutes) → minutes. */
+fun parseRuntimeMinutes(text: String?): Int? {
+    val t = text?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val parts = t.split(':').map { it.trim().toIntOrNull() ?: return null }
+    return when (parts.size) {
+        1 -> parts[0]
+        2 -> parts[0] * 60 + parts[1]
+        3 -> parts[0] * 60 + parts[1] + if (parts[2] >= 30) 1 else 0
+        else -> null
+    }?.takeIf { it > 0 }
+}
+
+/** Note sur 10 : « 6.1 » → « 6,1 » ; null pour 0, N/A… */
+fun ratingValue(text: String?): String? {
+    val value = text?.trim()?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0.0 && it <= 10.0 } ?: return null
+    val rounded = kotlin.math.round(value * 10).toInt()
+    return "${rounded / 10},${rounded % 10}"
+}
+
+/** « 6.1 » → « ★ 6,1 » */
+fun ratingLabel(text: String?): String? = ratingValue(text)?.let { "★ $it" }
+
+/** Ligne d'infos d'un film : année · genre · durée · note. */
+fun movieMetaLine(year: String?, genre: String?, minutes: Int?, rating: String?): String? =
+    listOfNotNull(
+        year?.trim()?.take(4)?.takeIf { it.length == 4 && it.all(Char::isDigit) },
+        genre?.trim()?.takeIf { it.isNotEmpty() && it != "N/A" },
+        minutes?.let(::runtimeLabel),
+        ratingLabel(rating),
+    ).joinToString(" · ").ifEmpty { null }

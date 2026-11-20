@@ -1,6 +1,7 @@
 package fr.bonobo.soufflytv.data
 
 import fr.bonobo.soufflytv.model.Category
+import fr.bonobo.soufflytv.model.MovieInfo
 import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.Programme
 import fr.bonobo.soufflytv.model.Section
@@ -36,6 +37,16 @@ interface IptvProvider {
 
     /** Émission en cours, depuis le guide déjà chargé (sans réseau). */
     fun epgNow(channel: Channel): Programme? = null
+
+    /** Fiche d'un film. Par défaut : ce que la liste fournit déjà (titre, affiche, résumé éventuel). */
+    suspend fun movieInfo(movie: Channel): MovieInfo = MovieInfo(movie.name, movie.plot, movie.logo)
+
+    /**
+     * Présentation d'une série (bandeau des affiches). Par défaut : ce que la liste fournit,
+     * sans charger les épisodes.
+     */
+    suspend fun seriesSummary(series: Channel): MovieInfo =
+        MovieInfo(series.name, series.plot, series.logo, meta = movieMetaLine(null, null, null, series.rating))
 
     /** Saisons et épisodes d'une série. */
     suspend fun seriesInfo(series: Channel): SeriesInfo =

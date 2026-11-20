@@ -15,6 +15,8 @@ import fr.bonobo.soufflytv.data.isAdultCategory
 import fr.bonobo.soufflytv.data.toUserMessage
 import fr.bonobo.soufflytv.model.Category
 import fr.bonobo.soufflytv.model.Channel
+import fr.bonobo.soufflytv.model.ItemType
+import fr.bonobo.soufflytv.model.MovieInfo
 import fr.bonobo.soufflytv.model.Section
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -70,6 +72,32 @@ class BrowserModel(
     /** Écran étroit : true quand la liste des chaînes remplace celle des catégories. */
     var showChannels by mutableStateOf(false)
 
+    // ---------- Bandeau des films et séries (grand écran, façon TiviMate) ----------
+
+    /** Affiche qui a le focus : le bandeau du haut présente ce film ou cette série. */
+    var heroItem by mutableStateOf<Channel?>(null)
+    /** Position de l'affiche dans la liste (compteur « 3 / 1017 »). */
+    var heroIndex by mutableIntStateOf(0)
+    /** Affiche ouverte : au retour, le focus revient sur elle (et non sur la catégorie). */
+    var returnFocusId by mutableStateOf<String?>(null)
+    private val details = HashMap<String, MovieInfo>()
+
+    fun focusPoster(item: Channel, index: Int) {
+        heroItem = item
+        heroIndex = index
+    }
+
+    /** Fiche du film ou de la série, gardée en mémoire pour un défilement fluide. */
+    fun cachedDetails(item: Channel): MovieInfo? = details[item.id]
+
+    suspend fun details(item: Channel): MovieInfo {
+        details[item.id]?.let { return it }
+        val info = if (item.type == ItemType.SERIES) provider.seriesSummary(item) else provider.movieInfo(item)
+        if (details.size > 400) details.clear()
+        details[item.id] = info
+        return info
+    }
+
     /** Positions de défilement, conservées pendant la lecture. */
     val categoryListState = LazyListState()
     val channelListState = LazyListState()
@@ -124,6 +152,8 @@ class BrowserModel(
         selected = null
         showChannels = false
         query = ""
+        heroItem = null
+        returnFocusId = null
         scope.launch { categoryListState.scrollToItem(0) }
         loadCategories()
     }
@@ -134,6 +164,9 @@ class BrowserModel(
         showChannels = true
         query = ""
         if (changed) {
+            heroItem = null
+            heroIndex = 0
+            returnFocusId = null
             // nouvelle catégorie : on repart du haut de la liste
             scope.launch {
                 channelListState.scrollToItem(0)

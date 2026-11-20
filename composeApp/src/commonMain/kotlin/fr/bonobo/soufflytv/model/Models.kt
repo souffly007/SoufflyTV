@@ -82,6 +82,8 @@ data class Channel(
     val plot: String? = null,
     /** Identifiant XMLTV de la chaîne (epg_channel_id Xtream). */
     val tvgId: String? = null,
+    /** Note sur 10 donnée par la source (films et séries), affichée sur l'affiche. */
+    val rating: String? = null,
 )
 
 /** Une émission du guide TV (heures en millisecondes UTC). */
@@ -105,6 +107,22 @@ data class SeriesInfo(
     val cover: String?,
     val meta: String?,
     val seasons: List<Season>,
+    val backdrop: String? = null,
+    val director: String? = null,
+    val cast: String? = null,
+)
+
+/** Fiche d'un film : résumé, année, genre, durée… (les champs absents restent à null). */
+data class MovieInfo(
+    val name: String,
+    val plot: String?,
+    val cover: String?,
+    /** Grande image de fond (Xtream : backdrop_path). */
+    val backdrop: String? = null,
+    /** « 2014 · Action, Science-fiction · 1 h 57 · ★ 6,1 » */
+    val meta: String? = null,
+    val director: String? = null,
+    val cast: String? = null,
 )
 
 /** Ce que le lecteur doit ouvrir. */

@@ -24,6 +24,10 @@ import fr.bonobo.soufflytv.data.AccountBackupCodec
 import fr.bonobo.soufflytv.data.BackupException
 import fr.bonobo.soufflytv.data.backupFileName
 import fr.bonobo.soufflytv.data.civilFromDays
+import fr.bonobo.soufflytv.data.movieMetaLine
+import fr.bonobo.soufflytv.data.parseRuntimeMinutes
+import fr.bonobo.soufflytv.data.ratingValue
+import fr.bonobo.soufflytv.data.runtimeLabel
 import fr.bonobo.soufflytv.player.TrackOption
 import fr.bonobo.soufflytv.player.isAudioDescription
 import fr.bonobo.soufflytv.player.pickAudioTrack
@@ -210,5 +214,18 @@ class ParsersTest {
         assertEquals("#EXTM3U", restored.playlists["p.m3u"])
         assertFailsWith<BackupException> { AccountBackupCodec.decode(text, "mauvais") }
         assertFailsWith<BackupException> { AccountBackupCodec.decode("pas une sauvegarde", "secret123") }
+    }
+
+    @Test
+    fun movieDetails() {
+        assertEquals("1 h 57", runtimeLabel(117))
+        assertEquals("45 min", runtimeLabel(45))
+        assertEquals(117, parseRuntimeMinutes("01:57:10"))
+        assertEquals(null, parseRuntimeMinutes("N/A"))
+        assertEquals("2014 · Action · 1 h 57 · ★ 6,1", movieMetaLine("2014-02-12", "Action", 117, "6.1"))
+        assertEquals(null, movieMetaLine(null, "", null, "0"))
+        assertEquals("6,9", ratingValue("6.9"))
+        assertEquals("10,0", ratingValue("10"))
+        assertEquals(null, ratingValue("N/A"))
     }
 }

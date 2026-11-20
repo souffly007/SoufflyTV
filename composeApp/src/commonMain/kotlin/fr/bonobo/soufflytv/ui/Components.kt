@@ -224,7 +224,11 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: Str
 
 /** Télécommande (Android TV, box, clavier sur Android) : les champs ne s'ouvrent que sur OK. */
 @Composable
-fun remoteTextInput(): Boolean = isAndroid && (isTvBuild || isKeyNavigation())
+fun remoteTextInput(): Boolean = remoteNavigation()
+
+/** Navigation à la télécommande sur Android (TV, box, ou téléphone piloté au clavier). */
+@Composable
+fun remoteNavigation(): Boolean = isAndroid && (isTvBuild || isKeyNavigation())
 
 /**
  * Champ de saisie utilisable au doigt, à la souris et à la télécommande.

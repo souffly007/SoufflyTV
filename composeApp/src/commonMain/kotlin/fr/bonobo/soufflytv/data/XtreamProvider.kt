@@ -3,6 +3,7 @@ package fr.bonobo.soufflytv.data
 import fr.bonobo.soufflytv.model.Category
 import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.ItemType
+import fr.bonobo.soufflytv.model.MovieInfo
 import fr.bonobo.soufflytv.model.Programme
 import fr.bonobo.soufflytv.model.Season
 import fr.bonobo.soufflytv.model.Section
@@ -157,6 +158,7 @@ class XtreamProvider(
                             number = o.s("num")?.toIntOrNull(),
                             type = ItemType.MOVIE,
                             plot = o.s("plot"),
+                            rating = o.s("rating"),
                         )
                     }
                     Section.SERIES -> {
@@ -170,6 +172,7 @@ class XtreamProvider(
                             number = o.s("num")?.toIntOrNull(),
                             type = ItemType.SERIES,
                             plot = o.s("plot"),
+                            rating = o.s("rating"),
                         )
                     }
                 }
@@ -183,6 +186,70 @@ class XtreamProvider(
         StreamRequest(channel.stream, channel.name, mapOf("User-Agent" to DEFAULT_USER_AGENT))
 
     // ---------- Séries ----------
+
+    private val movieCache = HashMap<String, MovieInfo>()
+
+    /** Fiche complète du film (get_vod_info) ; en cas d'échec, ce que la liste fournit. */
+    override suspend fun movieInfo(movie: Channel): MovieInfo {
+        movieCache[movie.id]?.let { return it }
+        val basic = MovieInfo(movie.name, movie.plot, movie.logo)
+        val vodId = movie.id.removePrefix("xt-movie-").takeIf { it != movie.id } ?: return basic
+        val json = try {
+            ensureLogin()
+            api("get_vod_info", "vod_id" to vodId) as? JsonObject
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        val info = json?.get("info") as? JsonObject ?: return basic
+        fun link(value: String?) = value?.takeIf { it.startsWith("http", ignoreCase = true) }
+        val backdrop = when (val b = info["backdrop_path"]) {
+            is JsonArray -> (b.firstOrNull() as? JsonPrimitive)?.content
+            is JsonPrimitive -> b.content
+            else -> null
+        }
+        val minutes = info.s("duration_secs")?.toIntOrNull()?.takeIf { it > 0 }?.let { (it + 30) / 60 }
+            ?: parseRuntimeMinutes(info.s("duration"))
+            ?: info.s("episode_run_time")?.toIntOrNull()
+        val result = MovieInfo(
+            name = movie.name,
+            plot = info.s("plot") ?: info.s("description") ?: movie.plot,
+            cover = link(info.s("movie_image")) ?: link(info.s("cover_big")) ?: movie.logo,
+            backdrop = link(backdrop),
+            meta = movieMetaLine(
+                info.s("releasedate") ?: info.s("release_date") ?: info.s("year"),
+                info.s("genre"),
+                minutes,
+                info.s("rating"),
+            ),
+            director = info.s("director")?.takeIf { it.isNotBlank() },
+            cast = (info.s("cast") ?: info.s("actors"))?.takeIf { it.isNotBlank() },
+        )
+        movieCache[movie.id] = result
+        return result
+    }
+
+    /** Une seule requête (get_series_info), gardée en cache pour l'ouverture de la série. */
+    override suspend fun seriesSummary(series: Channel): MovieInfo {
+        val info = try {
+            seriesInfo(series)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return super.seriesSummary(series)
+        }
+        val seasons = info.seasons.size
+        return MovieInfo(
+            name = series.name,
+            plot = info.plot,
+            cover = info.cover,
+            backdrop = info.backdrop,
+            meta = listOfNotNull(info.meta, if (seasons > 1) "$seasons saisons" else "1 saison").joinToString(" · "),
+            director = info.director,
+            cast = info.cast,
+        )
+    }
 
     override suspend fun seriesInfo(series: Channel): SeriesInfo {
         seriesCache[series.stream]?.let { return it }
@@ -212,17 +279,26 @@ class XtreamProvider(
             bySeason.entries.sortedBy { it.key }.map { (n, list) -> Season(n, list.sortedBy { it.number ?: 0 }) }
         }
         if (seasons.isEmpty()) throw IptvException("Aucun épisode disponible pour cette série")
-        val meta = listOfNotNull(
+        val meta = movieMetaLine(
+            info?.s("releaseDate") ?: info?.s("release_date") ?: info?.s("year"),
             info?.s("genre"),
-            info?.s("releaseDate") ?: info?.s("release_date"),
-            info?.s("rating")?.takeIf { it != "0" }?.let { "★ $it" },
-        ).joinToString(" · ").ifEmpty { null }
+            null,
+            info?.s("rating") ?: series.rating,
+        )
+        val backdrop = when (val b = info?.get("backdrop_path")) {
+            is JsonArray -> (b.firstOrNull() as? JsonPrimitive)?.content
+            is JsonPrimitive -> b.content
+            else -> null
+        }?.takeIf { it.startsWith("http", ignoreCase = true) }
         val result = SeriesInfo(
             name = info?.s("name") ?: series.name,
             plot = info?.s("plot") ?: series.plot,
             cover = info?.s("cover")?.takeIf { it.startsWith("http", ignoreCase = true) } ?: series.logo,
             meta = meta,
             seasons = seasons,
+            backdrop = backdrop,
+            director = info?.s("director")?.takeIf { it.isNotBlank() },
+            cast = (info?.s("cast") ?: info?.s("actors"))?.takeIf { it.isNotBlank() },
         )
         seriesCache[series.stream] = result
         return result

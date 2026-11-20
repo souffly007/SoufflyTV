@@ -41,6 +41,8 @@ sealed interface Screen {
     data object Settings : Screen
     data class Browse(val source: Source) : Screen
     data class Series(val source: Source, val series: Channel) : Screen
+    /** Fiche d'un film ; [channels]/[index] : la liste d'où il vient, transmise au lecteur. */
+    data class Movie(val source: Source, val channels: List<Channel>, val index: Int) : Screen
     data class ManageCategories(val source: Source, val section: Section) : Screen
     data class Player(val source: Source, val channels: List<Channel>, val index: Int) : Screen
 }
@@ -135,6 +137,9 @@ class AppState {
         val item = list[index]
         if (item.type == ItemType.SERIES) {
             navigate(Screen.Series(source, item))
+        } else if (item.type == ItemType.MOVIE) {
+            val playable = list.filter { it.type != ItemType.SERIES }
+            navigate(Screen.Movie(source, playable, playable.indexOf(item).coerceAtLeast(0)))
         } else {
             val playable = list.filter { it.type != ItemType.SERIES }
             navigate(Screen.Player(source, playable, playable.indexOf(item).coerceAtLeast(0)))

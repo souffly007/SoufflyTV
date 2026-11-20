@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.6.0 && git push origin v0.6.0
+git tag v0.6.1 && git push origin v0.6.1
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -172,6 +172,8 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
 - [x] Guide **partagé entre les versions** d'une même chaîne (TF1 SD / HD / FHD / 4K…)
 
 **Bibliothèque**
+- [x] **Bandeau façon TiviMate** (TV) : l'affiche sélectionnée est présentée en grand en haut (image, titre, année · genre · durée · note, distribution, résumé), compteur « 3 / 1017 », note sur chaque affiche
+- [x] **Fiche film** : affiche, année, genre, durée, note, résumé, réalisation et distribution, puis **Lecture** (ou **Reprendre** / **Depuis le début**)
 - [x] **Masquer des catégories** par source et par rubrique : par pays/groupe d'un coup (FR, UK, DE…), tout masquer / tout afficher, recherche, une par une
 - [x] Favoris et **Récents** par source (catégories en tête de liste), ligne « Reprendre » sur l'accueil
 - [x] **Reprise** des films et épisodes là où tu t'étais arrêté

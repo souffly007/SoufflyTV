@@ -39,9 +39,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -55,8 +57,11 @@ import fr.bonobo.soufflytv.Screen
 import androidx.compose.material3.TextButton
 import fr.bonobo.soufflytv.data.detail
 import fr.bonobo.soufflytv.data.kindLabel
+import fr.bonobo.soufflytv.data.movieMetaLine
+import fr.bonobo.soufflytv.data.ratingValue
 import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.ItemType
+import fr.bonobo.soufflytv.model.MovieInfo
 import fr.bonobo.soufflytv.model.Programme
 import fr.bonobo.soufflytv.model.Section
 import fr.bonobo.soufflytv.model.Source
@@ -65,6 +70,7 @@ import fr.bonobo.soufflytv.platform.isTvBuild
 import fr.bonobo.soufflytv.platform.nowMillis
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 @Composable
@@ -231,7 +237,7 @@ private fun CategoryPane(model: BrowserModel, modifier: Modifier) {
     // Télécommande : à l'ouverture et au retour du lecteur, le focus va sur la catégorie choisie
     KeepFocus(
         selectedFocus, selectedId, model.loadedOnce,
-        isFocused = { selectedFocused || selectedId == null },
+        isFocused = { selectedFocused || selectedId == null || model.returnFocusId != null },
         prepare = {
             val item = model.categories.indexOfFirst { it.id == selectedId } + 1 // ligne 0 : en-tête
             if (item > 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == item }) {
@@ -303,6 +309,11 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
         Section.SERIES -> "élément(s)"
     }
     val showEpg = model.section == Section.LIVE && model.provider.hasLocalEpg && state.settings.value.epgInLists
+    // Films et séries à la télécommande : bandeau du haut qui présente l'affiche sélectionnée
+    val heroMode = wide && posters && remoteNavigation() && filtered.isNotEmpty() && !model.channelsLoading
+    val hero = if (heroMode) {
+        model.heroItem?.takeIf { h -> filtered.any { it.id == h.id } } ?: filtered.first()
+    } else null
 
     // Rafraîchit l'émission en cours affichée dans la liste
     var clock by remember { mutableLongStateOf(nowMillis()) }
@@ -313,9 +324,12 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
         }
     }
 
-    Column(modifier) {
+    BoxWithConstraints(modifier) {
+    val heroHeight = (maxHeight * 0.47f).coerceIn(190.dp, 360.dp)
+    Column(Modifier.fillMaxSize()) {
+        if (hero != null) PosterHero(model, hero, Modifier.fillMaxWidth().height(heroHeight))
         Row(
-            Modifier.fillMaxWidth().padding(start = 6.dp, end = 12.dp, top = 8.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth().padding(start = 6.dp, end = 12.dp, top = if (hero != null) 2.dp else 8.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showBack) {
@@ -335,7 +349,12 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (category != null && !model.channelsLoading) {
-                    Text("${filtered.size} $unit", style = MonoLabel, color = Cm.TextMuted)
+                    val position = hero?.let { h -> filtered.indexOfFirst { it.id == h.id } + 1 } ?: 0
+                    Text(
+                        if (position > 0) "$position / ${filtered.size}" else "${filtered.size} $unit",
+                        style = MonoLabel,
+                        color = Cm.TextMuted,
+                    )
                 }
             }
             // Grand écran : la recherche tient sur la ligne du titre
@@ -372,19 +391,44 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
                     else -> "Cette catégorie est vide"
                 }
             )
-            posters -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(128.dp),
-                state = model.posterGridState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(8.dp),
-            ) {
-                itemsIndexed(filtered) { index, item ->
-                    PosterCard(
-                        item,
-                        favorite = model.isFavorite(item),
-                        onClick = { state.openItem(source, filtered, index) },
-                        onLongClick = { model.toggleFavorite(item) },
-                    )
+            posters -> {
+                // Retour d'une fiche ou du lecteur : le focus revient sur l'affiche ouverte
+                val posterFocus = remember { FocusRequester() }
+                var posterFocused by remember { mutableStateOf(false) }
+                val returnId = model.returnFocusId
+                KeepFocus(
+                    posterFocus, returnId, filtered.size,
+                    isFocused = { posterFocused || model.returnFocusId == null },
+                    prepare = {
+                        val target = filtered.indexOfFirst { it.id == returnId }
+                        val grid = model.posterGridState
+                        if (target >= 0 && grid.layoutInfo.visibleItemsInfo.none { it.index == target }) {
+                            grid.scrollToItem(target)
+                        }
+                    },
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(if (heroMode) 112.dp else 128.dp),
+                    state = model.posterGridState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(8.dp),
+                ) {
+                    itemsIndexed(filtered, key = { _, item -> item.id }) { index, item ->
+                        PosterCard(
+                            item,
+                            favorite = model.isFavorite(item),
+                            focusModifier = if (item.id == returnId) {
+                                Modifier.focusRequester(posterFocus).onFocusChanged { posterFocused = it.isFocused }
+                            } else Modifier,
+                            onFocused = { model.focusPoster(item, index) },
+                            onClick = {
+                                model.returnFocusId = item.id
+                                model.focusPoster(item, index)
+                                state.openItem(source, filtered, index)
+                            },
+                            onLongClick = { model.toggleFavorite(item) },
+                        )
+                    }
                 }
             }
             else -> LazyColumn(Modifier.fillMaxSize(), state = model.channelListState, contentPadding = PaddingValues(8.dp)) {
@@ -402,6 +446,94 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
                 }
             }
         }
+    }
+    }
+}
+
+/**
+ * Bandeau façon TiviMate, esprit Souffly : l'affiche sélectionnée est présentée en grand
+ * (image à droite fondue dans le fond, titre, année · genre · durée · note, distribution, résumé).
+ */
+@Composable
+private fun PosterHero(model: BrowserModel, item: Channel, modifier: Modifier) {
+    val basic = remember(item.id) {
+        MovieInfo(item.name, item.plot, item.logo, meta = movieMetaLine(null, null, null, item.rating))
+    }
+    var info by remember(item.id) { mutableStateOf(model.cachedDetails(item) ?: basic) }
+    LaunchedEffect(item.id) {
+        if (model.cachedDetails(item) != null) return@LaunchedEffect
+        delay(400) // défilement rapide : pas de requête pour chaque affiche survolée
+        try {
+            info = model.details(item)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // on garde ce que la liste fournit
+        }
+    }
+
+    Box(modifier.clipToBounds().background(Cm.Background)) {
+        val image = info.backdrop ?: info.cover
+        if (image != null) {
+            AsyncImage(
+                model = image,
+                contentDescription = null,
+                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.62f).align(Alignment.CenterEnd),
+                contentScale = ContentScale.Crop,
+            )
+            // Fondu vers la gauche (texte lisible) et vers le bas (grille des affiches)
+            Box(
+                Modifier.matchParentSize().background(
+                    Brush.horizontalGradient(
+                        0f to Cm.Background,
+                        0.38f to Cm.Background,
+                        0.62f to Cm.Background.copy(alpha = 0.55f),
+                        1f to Color.Transparent,
+                    )
+                )
+            )
+            Box(
+                Modifier.matchParentSize().background(
+                    Brush.verticalGradient(0.55f to Color.Transparent, 1f to Cm.Background)
+                )
+            )
+        }
+        Column(Modifier.fillMaxHeight().fillMaxWidth(0.64f).padding(start = 18.dp, top = 12.dp, end = 8.dp, bottom = 4.dp)) {
+            Text(
+                info.name,
+                color = Cm.Text,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            info.meta?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, color = Cm.Cyan, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            info.cast?.let { HeroCredit("Avec", it) }
+            info.director?.let { HeroCredit("Réalisation", it) }
+            info.plot?.takeIf { it.isNotBlank() }?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    it,
+                    color = Cm.Text.copy(alpha = 0.9f),
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroCredit(label: String, value: String) {
+    Spacer(Modifier.height(4.dp))
+    Row {
+        Text("$label : ", color = Cm.TextMuted, fontSize = 13.sp)
+        Text(value, color = Cm.Text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -462,9 +594,23 @@ private fun ChannelRow(
 }
 
 @Composable
-private fun PosterCard(item: Channel, favorite: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun PosterCard(
+    item: Channel,
+    favorite: Boolean,
+    focusModifier: Modifier = Modifier,
+    onFocused: () -> Unit = {},
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     var loaded by remember(item.logo) { mutableStateOf(false) }
-    Column(Modifier.padding(4.dp).tvClickable(onClick = onClick, onLongClick = onLongClick).padding(6.dp)) {
+    Column(
+        Modifier
+            .padding(4.dp)
+            .then(focusModifier)
+            .onFocusChanged { if (it.isFocused) onFocused() }
+            .tvClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(6.dp)
+    ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Cm.SurfaceHigher),
             contentAlignment = Alignment.Center,
@@ -498,7 +644,20 @@ private fun PosterCard(item: Channel, favorite: Boolean, onClick: () -> Unit, on
                 }
             }
             if (item.type == ItemType.SERIES) {
-                Box(Modifier.align(Alignment.BottomStart).padding(6.dp)) { TypeBadge("SÉRIE") }
+                Box(Modifier.align(Alignment.TopStart).padding(6.dp)) { TypeBadge("SÉRIE") }
+            }
+            ratingValue(item.rating)?.let { note ->
+                Text(
+                    note,
+                    color = Cm.OnCyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp)
+                        .background(Cm.Cyan, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                )
             }
         }
         Spacer(Modifier.height(6.dp))
