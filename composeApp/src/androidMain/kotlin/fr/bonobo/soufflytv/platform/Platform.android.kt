@@ -2,8 +2,14 @@ package fr.bonobo.soufflytv.platform
 
 import android.app.Activity
 import android.content.Context
+import android.content.ContentValues
+import android.content.ActivityNotFoundException
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -185,7 +191,7 @@ internal tailrec fun Context.findActivity(): Activity? = when (this) {
 // ---------- Sélecteur de fichier ----------
 
 @Composable
-actual fun rememberFilePicker(onPicked: (PickedFile?) -> Unit): () -> Unit {
+actual fun rememberFilePicker(title: String, onPicked: (PickedFile?) -> Unit): () -> Boolean {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val callback by rememberUpdatedState(onPicked)
@@ -197,9 +203,7 @@ actual fun rememberFilePicker(onPicked: (PickedFile?) -> Unit): () -> Unit {
                 val picked = withContext(Dispatchers.IO) {
                     try {
                         val resolver = context.contentResolver
-                        val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-                            ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
-                            ?: "playlist.m3u"
+                        val name = displayName(context, uri) ?: "fichier"
                         val text = resolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
                         text?.let { PickedFile(name, it) }
                     } catch (e: Exception) {
@@ -210,5 +214,78 @@ actual fun rememberFilePicker(onPicked: (PickedFile?) -> Unit): () -> Unit {
             }
         }
     }
-    return remember(launcher) { { launcher.launch(arrayOf("*/*")) } }
+    return remember(launcher) {
+        {
+            try {
+                launcher.launch(arrayOf("*/*"))
+                true
+            } catch (e: ActivityNotFoundException) {
+                // Pas d'explorateur de fichiers (fréquent sur Android TV)
+                false
+            }
+        }
+    }
+}
+
+@Composable
+actual fun rememberFileSaver(onSaved: (SaveResult) -> Unit): (fileName: String, content: String) -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val callback by rememberUpdatedState(onSaved)
+    val pending = remember { arrayOfNulls<String>(1) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        val content = pending[0]
+        pending[0] = null
+        if (uri == null || content == null) {
+            callback(SaveResult.Cancelled)
+        } else {
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    try {
+                        context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(content.toByteArray()) }
+                            ?: error("écriture impossible")
+                        SaveResult.Saved(displayName(context, uri) ?: "fichier enregistré")
+                    } catch (e: Exception) {
+                        SaveResult.Failed("Enregistrement impossible : ${e.message}")
+                    }
+                }
+                callback(result)
+            }
+        }
+    }
+    return remember(launcher) {
+        { fileName, content ->
+            pending[0] = content
+            try {
+                launcher.launch(fileName)
+            } catch (e: ActivityNotFoundException) {
+                // Téléviseur sans explorateur : directement dans Téléchargements
+                pending[0] = null
+                scope.launch { callback(withContext(Dispatchers.IO) { saveToDownloads(context, fileName, content) }) }
+            }
+        }
+    }
+}
+
+private fun displayName(context: Context, uri: Uri): String? =
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+
+private fun saveToDownloads(context: Context, fileName: String, content: String): SaveResult {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        return SaveResult.Failed("Aucun explorateur de fichiers sur cet appareil pour choisir où enregistrer")
+    }
+    return try {
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, "application/json")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("dossier inaccessible")
+        resolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) } ?: error("écriture impossible")
+        SaveResult.Saved("Téléchargements/$fileName")
+    } catch (e: Exception) {
+        SaveResult.Failed("Enregistrement impossible : ${e.message}")
+    }
 }

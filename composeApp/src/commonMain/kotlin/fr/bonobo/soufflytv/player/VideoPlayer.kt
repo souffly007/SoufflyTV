@@ -34,7 +34,44 @@ data class PlayerOptions(
     val buffer: BufferMode,
 )
 
-data class TrackOption(val id: String, val label: String, val selected: Boolean)
+data class TrackOption(
+    val id: String,
+    val label: String,
+    val selected: Boolean,
+    /** Code langue de la piste (« fra », « qad »…), quand le flux l'indique. */
+    val language: String? = null,
+    /** Piste d'audiodescription : une voix décrit l'image (pour les personnes malvoyantes). */
+    val audioDescription: Boolean = false,
+)
+
+private val AUDIO_DESCRIPTION_WORDS = listOf(
+    "audiodescription", "audio description", "audio-description", "audiodesc",
+    "malvoyant", "visually impaired", "described video", "video description", "[qad]",
+)
+private val AUDIO_DESCRIPTION_TAG = Regex("""(^|[\s\[(\-_/|·:])(ad|qad)($|[\s\])\-_/|·:])""")
+
+/**
+ * Reconnaît une piste d'audiodescription à son code langue (« qad », utilisé par les chaînes françaises)
+ * ou à son nom (« Audiodescription », « Français AD », « [qad] »…).
+ */
+fun isAudioDescription(label: String?, language: String?): Boolean {
+    if (language?.trim()?.lowercase() == "qad") return true
+    val text = label?.lowercase() ?: return false
+    return AUDIO_DESCRIPTION_WORDS.any { it in text } || AUDIO_DESCRIPTION_TAG.containsMatchIn(text)
+}
+
+/**
+ * Piste audio à choisir selon le réglage d'audiodescription, ou null s'il n'y a rien à changer
+ * (la piste en cours convient déjà, ou il n'existe pas d'autre piste du type voulu).
+ */
+fun pickAudioTrack(tracks: List<TrackOption>, wantAudioDescription: Boolean): TrackOption? {
+    val current = tracks.firstOrNull { it.selected } ?: return null
+    if (current.audioDescription == wantAudioDescription) return null
+    val candidates = tracks.filter { it.audioDescription == wantAudioDescription }
+    if (candidates.isEmpty()) return null
+    // même langue que la piste en cours si possible (Français → Français AD, et inversement)
+    return candidates.firstOrNull { current.language != null && it.language == current.language } ?: candidates.first()
+}
 
 /** Ce que chaque lecteur natif sait faire. */
 interface PlayerImpl {

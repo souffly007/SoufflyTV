@@ -53,6 +53,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import fr.bonobo.soufflytv.platform.isAndroid
+import fr.bonobo.soufflytv.platform.isTvBuild
 import coil3.compose.AsyncImage
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
@@ -189,23 +209,184 @@ private fun initials(name: String): String =
         .joinToString("") { it.first().uppercase() }
         .ifEmpty { "TV" }
 
+/** Champ de recherche : loupe à gauche, croix pour effacer (appui long sur OK à la télécommande). */
 @Composable
 fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier) {
-    OutlinedTextField(
+    RemoteTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier,
+        placeholder = placeholder,
+        leadingIcon = AppIcons.Search,
+        clearable = true,
+    )
+}
+
+/** Télécommande (Android TV, box, clavier sur Android) : les champs ne s'ouvrent que sur OK. */
+@Composable
+fun remoteTextInput(): Boolean = isAndroid && (isTvBuild || isKeyNavigation())
+
+/**
+ * Champ de saisie utilisable au doigt, à la souris et à la télécommande.
+ *
+ * Au doigt et sur PC : un champ classique.
+ * À la télécommande : une case qui se traverse avec ▲ ▼ comme un bouton ;
+ * OK ouvre la saisie et le clavier, « OK / Terminé » du clavier ou Retour la referment
+ * et rendent le focus à la case. Plus besoin de faire Retour pour continuer à descendre.
+ */
+@Composable
+fun RemoteTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    placeholder: String = "",
+    leadingIcon: ImageVector? = null,
+    hidden: Boolean = false,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    isError: Boolean = false,
+    supporting: String? = null,
+    clearable: Boolean = false,
+) {
+    val remote = remoteTextInput()
+    var editing by remember { mutableStateOf(false) }
+    var returnFocus by remember { mutableStateOf(false) }
+    var hadFocus by remember { mutableStateOf(false) }
+    val boxFocus = remember { FocusRequester() }
+    val fieldFocus = remember { FocusRequester() }
+    val shape = RoundedCornerShape(12.dp)
+
+    fun stopEditing(keepFocus: Boolean) {
+        returnFocus = keepFocus
+        editing = false
+    }
+
+    if (remote && !editing) {
+        LaunchedEffect(Unit) {
+            if (returnFocus) {
+                returnFocus = false
+                withFrameNanos { }
+                runCatching { boxFocus.requestFocus() }
+            }
+        }
+        Column(modifier) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .focusRequester(boxFocus)
+                    .border(1.dp, if (isError) Cm.Error else Cm.Outline, shape)
+                    .tvClickable(
+                        shape = shape,
+                        onLongClick = if (clearable && value.isNotEmpty()) ({ onValueChange("") }) else null,
+                    ) { editing = true }
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (leadingIcon != null) {
+                    Icon(leadingIcon, contentDescription = null, tint = Cm.TextMuted)
+                    Spacer(Modifier.width(12.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    if (label != null) Text(label, color = if (isError) Cm.Error else Cm.TextMuted, fontSize = 12.sp)
+                    Text(
+                        when {
+                            value.isEmpty() -> placeholder
+                            hidden -> "•".repeat(value.length)
+                            else -> value
+                        },
+                        color = if (value.isEmpty()) Cm.TextMuted else Cm.Text,
+                        fontSize = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Icon(AppIcons.Edit, contentDescription = "Saisir", tint = Cm.TextMuted, modifier = Modifier.size(18.dp))
+            }
+            if (supporting != null) {
+                Text(
+                    supporting,
+                    color = if (isError) Cm.Error else Cm.TextMuted,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp),
+                )
+            }
+        }
+        return
+    }
+
+    if (remote) {
+        val keyboard = LocalSoftwareKeyboardController.current
+        LaunchedEffect(Unit) {
+            withFrameNanos { }
+            runCatching { fieldFocus.requestFocus() }
+            delay(100)
+            keyboard?.show()
+        }
+        // Clavier refermé (Retour) : la saisie se termine, le focus reste sur la case
+        val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+        var imeShown by remember { mutableStateOf(false) }
+        LaunchedEffect(imeBottom) {
+            if (imeBottom > 0) {
+                imeShown = true
+            } else if (imeShown) {
+                imeShown = false
+                stopEditing(keepFocus = true)
+            }
+        }
+    }
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .focusRequester(fieldFocus)
+            .onFocusChanged { state ->
+                if (state.isFocused) {
+                    hadFocus = true
+                } else if (hadFocus) {
+                    hadFocus = false
+                    // Focus parti ailleurs (▲ ▼) : la case reprend sa place, sans y ramener le focus
+                    if (remote && editing) stopEditing(keepFocus = false)
+                }
+            }
+            .onPreviewKeyEvent { event ->
+                // Retour pendant la saisie (clavier déjà fermé) : on referme le champ, sans quitter l'écran
+                if (remote && event.key == Key.Back) {
+                    if (event.type == KeyEventType.KeyUp) stopEditing(keepFocus = true)
+                    true
+                } else {
+                    false
+                }
+            },
         singleLine = true,
-        shape = RoundedCornerShape(12.dp),
-        placeholder = { Text(placeholder, color = Cm.TextMuted) },
-        leadingIcon = { Icon(AppIcons.Search, contentDescription = null, tint = Cm.TextMuted) },
-        trailingIcon = if (value.isNotEmpty()) {
+        shape = shape,
+        label = if (label != null) {
+            { Text(label) }
+        } else null,
+        placeholder = if (placeholder.isNotEmpty()) {
+            { Text(placeholder, color = Cm.TextMuted.copy(alpha = 0.7f)) }
+        } else null,
+        leadingIcon = if (leadingIcon != null) {
+            { Icon(leadingIcon, contentDescription = null, tint = Cm.TextMuted) }
+        } else null,
+        trailingIcon = if (clearable && value.isNotEmpty()) {
             {
                 IconButton(onClick = { onValueChange("") }) {
                     Icon(AppIcons.Close, contentDescription = "Effacer", tint = Cm.TextMuted)
                 }
             }
         } else null,
+        isError = isError,
+        supportingText = if (supporting != null) {
+            { Text(supporting) }
+        } else null,
+        visualTransformation = if (hidden) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = {
+            if (remote) stopEditing(keepFocus = true) else defaultKeyboardAction(ImeAction.Done)
+        }),
     )
 }
 

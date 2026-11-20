@@ -29,6 +29,8 @@ data class Settings(
     val resumeLastChannel: Boolean = false,
     /** Accueil : bandeau « Reprendre » avec les dernières chaînes. */
     val showResumeRow: Boolean = false,
+    /** Choisir les pistes d'audiodescription quand elles existent (sinon, la piste normale). */
+    val audioDescription: Boolean = false,
 )
 
 class SettingsStore(private val scope: CoroutineScope) {

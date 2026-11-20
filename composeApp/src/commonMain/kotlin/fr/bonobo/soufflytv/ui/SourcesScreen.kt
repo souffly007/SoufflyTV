@@ -118,7 +118,7 @@ fun SourcesScreen(state: AppState) {
                 }
                 item {
                     Text(
-                        "SoufflyTV v0.5 · GPL v3 · aucune chaîne fournie",
+                        "SoufflyTV v0.6 · GPL v3 · aucune chaîne fournie",
                         style = MonoLabel,
                         color = Cm.TextMuted.copy(alpha = 0.6f),
                         modifier = Modifier.padding(start = 16.dp, top = 12.dp),

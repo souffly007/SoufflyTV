@@ -73,6 +73,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,6 +96,7 @@ import fr.bonobo.soufflytv.player.PlayerOptions
 import fr.bonobo.soufflytv.player.PlayerStatus
 import fr.bonobo.soufflytv.player.TrackOption
 import fr.bonobo.soufflytv.player.VideoPlayer
+import fr.bonobo.soufflytv.player.pickAudioTrack
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
 import kotlinx.coroutines.CancellationException
@@ -336,6 +338,16 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
             digits = ""
         }
     }
+    // Audiodescription : dès que les pistes d'une chaîne sont connues, on prend celle qui correspond au réglage.
+    // Une seule fois par chaîne et par réglage : un choix manuel dans le menu Audio est ensuite respecté.
+    var audioChoiceDone by remember(request, retry, settings.audioDescription) { mutableStateOf(false) }
+    LaunchedEffect(controller.audioTracks, audioChoiceDone) {
+        val tracks = controller.audioTracks
+        if (audioChoiceDone || tracks.none { it.selected }) return@LaunchedEffect
+        pickAudioTrack(tracks, settings.audioDescription)?.let { controller.selectAudio(it.id) }
+        audioChoiceDone = true
+    }
+
     LaunchedEffect(toast) {
         if (toast != null) {
             delay(3_000)
@@ -460,6 +472,12 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
             onPip = if (isTvBuild) null else state.enterPictureInPicture,
             onFullscreen = state.toggleFullscreen,
             onChannels = if (live) ({ openPanel(groups = false) }) else null,
+            onAudioDescription = {
+                val enable = controller.audioTracks.firstOrNull { it.selected }?.audioDescription != true
+                pickAudioTrack(controller.audioTracks, enable)?.let { controller.selectAudio(it.id) }
+                state.settings.update { it.copy(audioDescription = enable) }
+                toast = if (enable) "Audiodescription activée" else "Audiodescription désactivée"
+            },
             onInteract = { interaction++ },
         )
     }
@@ -624,6 +642,7 @@ private fun PlayerTopBar(
     onPip: (() -> Unit)?,
     onFullscreen: (() -> Unit)?,
     onChannels: (() -> Unit)?,
+    onAudioDescription: () -> Unit,
     onInteract: () -> Unit,
 ) {
     Row(
@@ -667,6 +686,23 @@ private fun PlayerTopBar(
                 contentDescription = if (favorite) "Retirer des favoris" else "Ajouter aux favoris",
                 tint = if (favorite) Cm.Cyan else Cm.Text,
             )
+        }
+        // Bouton AD : seulement si la chaîne propose une piste d'audiodescription et une piste normale
+        val tracks = controller.audioTracks
+        if (tracks.any { it.audioDescription } && tracks.any { !it.audioDescription }) {
+            val active = tracks.firstOrNull { it.selected }?.audioDescription == true
+            IconButton(onClick = onAudioDescription) {
+                Text(
+                    "AD",
+                    color = if (active) Cm.Cyan else Cm.Text,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    textDecoration = if (active) null else TextDecoration.LineThrough,
+                    modifier = Modifier.semantics {
+                        contentDescription = if (active) "Désactiver l'audiodescription" else "Activer l'audiodescription"
+                    },
+                )
+            }
         }
         if (controller.audioTracks.size > 1) {
             TrackMenu(
@@ -767,6 +803,10 @@ private fun LiveBar(
                     )
                 }
                 Text(current.title, color = Cm.Text, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Résumé de l'émission, quand le guide TV en donne un
+                current.description?.takeIf { it.isNotBlank() }?.let { summary ->
+                    Text(summary, color = Cm.TextMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
                 Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { current.progress(clock) },

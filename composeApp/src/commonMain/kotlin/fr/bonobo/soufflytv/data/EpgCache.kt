@@ -11,7 +11,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-internal class CachedProgramme(val s: Long, val e: Long, val t: String)
+/** s/e : début et fin, t : titre, d : résumé (raccourci, pour garder un fichier léger). */
+internal class CachedProgramme(val s: Long, val e: Long, val t: String, val d: String? = null)
 
 @Serializable
 internal class EpgCacheFile(val savedAt: Long, val channels: Map<String, List<CachedProgramme>>)
@@ -27,6 +28,7 @@ object EpgCache {
 
     /** Au-delà, le guide enregistré ne couvre plus assez l'avenir : on l'ignore. */
     private const val MAX_AGE_MS = 30 * HOUR_MS
+    private const val MAX_DESCRIPTION = 400
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -39,7 +41,7 @@ object EpgCache {
             try {
                 val file = json.decodeFromString(EpgCacheFile.serializer(), text)
                 if (nowMillis() - file.savedAt > MAX_AGE_MS) return@withContext null
-                file.savedAt to file.channels.mapValues { (_, list) -> list.map { Programme(it.s, it.e, it.t) } }
+                file.savedAt to file.channels.mapValues { (_, list) -> list.map { Programme(it.s, it.e, it.t, it.d) } }
             } catch (e: Exception) {
                 null
             }
@@ -51,7 +53,7 @@ object EpgCache {
         val text = withContext(Dispatchers.Default) {
             val limit = nowMillis() - HOUR_MS
             val compact = byChannel.mapValues { (_, list) ->
-                list.filter { it.stop >= limit }.map { CachedProgramme(it.start, it.stop, it.title) }
+                list.filter { it.stop >= limit }.map { CachedProgramme(it.start, it.stop, it.title, it.description?.take(MAX_DESCRIPTION)) }
             }.filterValues { it.isNotEmpty() }
             json.encodeToString(EpgCacheFile.serializer(), EpgCacheFile(savedAt, compact))
         }

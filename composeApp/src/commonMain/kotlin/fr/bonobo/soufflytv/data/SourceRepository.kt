@@ -47,6 +47,18 @@ class SourceRepository {
         persist()
     }
 
+    /** Ajoute ou remplace (même identifiant) plusieurs sources, avec une seule écriture. */
+    suspend fun saveAll(sources: List<Source>) = mutex.withLock {
+        val byId = _sources.value.associateBy { it.id }.toMutableMap()
+        val order = _sources.value.map { it.id }.toMutableList()
+        for (source in sources) {
+            if (source.id !in byId) order += source.id
+            byId[source.id] = source
+        }
+        _sources.value = order.mapNotNull { byId[it] }
+        persist()
+    }
+
     suspend fun remove(id: String) = mutex.withLock {
         _sources.value = _sources.value.filterNot { it.id == id }
         persist()

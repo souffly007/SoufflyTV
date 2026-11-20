@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import fr.bonobo.soufflytv.data.AccountBackup
+import fr.bonobo.soufflytv.data.AccountBackupCodec
 import fr.bonobo.soufflytv.data.EpgCache
 import fr.bonobo.soufflytv.data.IptvProvider
 import fr.bonobo.soufflytv.data.LibraryStore
@@ -11,16 +13,27 @@ import fr.bonobo.soufflytv.data.SettingsStore
 import fr.bonobo.soufflytv.data.SourceRepository
 import fr.bonobo.soufflytv.data.createHttpClient
 import fr.bonobo.soufflytv.data.createProvider
+import fr.bonobo.soufflytv.data.normalizeUrl
 import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.ItemType
 import fr.bonobo.soufflytv.model.Section
 import fr.bonobo.soufflytv.model.Source
 import fr.bonobo.soufflytv.platform.deleteAppFile
+import fr.bonobo.soufflytv.platform.nowMillis
+import fr.bonobo.soufflytv.platform.readAppFile
+import fr.bonobo.soufflytv.platform.writeAppFile
 import fr.bonobo.soufflytv.ui.BrowserModel
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+data class ImportSummary(val added: Int, val updated: Int)
 
 sealed interface Screen {
     data object Sources : Screen
@@ -174,6 +187,38 @@ class AppState {
             EpgCache.delete(source.id)
             if (source is Source.M3u && source.localFile != null) deleteAppFile(source.localFile)
         }
+    }
+
+    // ---------- Sauvegarde des comptes ----------
+
+    /** Fichier chiffré contenant toutes les sources (et les playlists importées depuis un fichier). */
+    suspend fun exportAccounts(password: String): String {
+        val list = sources.value
+        val playlists = list.filterIsInstance<Source.M3u>()
+            .mapNotNull { m3u -> m3u.localFile?.let { file -> readAppFile(file)?.let { file to it } } }
+            .toMap()
+        val backup = AccountBackup(exportedAt = nowMillis(), sources = list, playlists = playlists)
+        return withContext(Dispatchers.Default) { AccountBackupCodec.encode(backup, password) }
+    }
+
+    /**
+     * Restaure une sauvegarde : les comptes absents sont ajoutés, ceux déjà présents (même compte) sont mis à jour.
+     * Lève [fr.bonobo.soufflytv.data.BackupException] si le fichier ou le mot de passe ne conviennent pas.
+     */
+    suspend fun importAccounts(text: String, password: String): ImportSummary {
+        val backup = withContext(Dispatchers.Default) { AccountBackupCodec.decode(text, password) }
+        backup.playlists.forEach { (file, content) -> writeAppFile(file, content) }
+        val existing = sources.value.map { it.id }.toSet()
+        val updated = backup.sources.count { it.id in existing }
+        repository.saveAll(backup.sources)
+        return ImportSummary(added = backup.sources.size - updated, updated = updated)
+    }
+
+    /** Sauvegarde déposée en ligne (pratique pour une TV sans explorateur de fichiers). */
+    suspend fun downloadText(url: String): String {
+        val response = http.get(normalizeUrl(url))
+        if (!response.status.isSuccess()) error("Le serveur répond ${response.status.value}")
+        return response.bodyAsText()
     }
 
     fun close() {

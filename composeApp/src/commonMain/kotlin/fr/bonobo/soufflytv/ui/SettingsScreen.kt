@@ -78,6 +78,11 @@ fun SettingsScreen(state: AppState) {
                     settings.resumeLastChannel,
                 ) { v -> state.settings.update { it.copy(resumeLastChannel = v) } }
                 SwitchRow(
+                    "Audiodescription",
+                    "Une voix décrit l'image, pour les personnes malvoyantes. Désactivée : la piste normale est choisie. Aussi via le bouton AD du lecteur",
+                    settings.audioDescription,
+                ) { v -> state.settings.update { it.copy(audioDescription = v) } }
+                SwitchRow(
                     "Épisode suivant automatique",
                     "Enchaîne l'épisode suivant à la fin d'un épisode",
                     settings.autoNextEpisode,
@@ -115,6 +120,10 @@ fun SettingsScreen(state: AppState) {
                 ) { v -> state.settings.update { it.copy(hideAdult = v) } }
 
                 Spacer(Modifier.height(12.dp))
+                SectionLabel("COMPTES", Modifier.padding(start = 14.dp, top = 8.dp, bottom = 6.dp))
+                AccountsBackupSection(state)
+
+                Spacer(Modifier.height(12.dp))
                 SectionLabel("DONNÉES", Modifier.padding(start = 14.dp, top = 8.dp, bottom = 6.dp))
                 OutlinedButton(onClick = { confirmClear = true }, modifier = Modifier.padding(horizontal = 14.dp)) {
                     Text("Effacer l'historique et les reprises")
@@ -123,7 +132,7 @@ fun SettingsScreen(state: AppState) {
                 Spacer(Modifier.height(24.dp))
                 SectionLabel("À PROPOS", Modifier.padding(start = 14.dp, bottom = 6.dp))
                 Text(
-                    "SoufflyTV 0.5 (${if (isTvBuild) "version TV" else if (isAndroid) "version smartphone" else "version ordinateur"}) — lecteur IPTV libre sous licence GPL v3.\n" +
+                    "SoufflyTV 0.6 (${if (isTvBuild) "version TV" else if (isAndroid) "version smartphone" else "version ordinateur"}) — lecteur IPTV libre sous licence GPL v3.\n" +
                         "Aucune chaîne ni liste n'est fournie : l'application lit uniquement les sources que tu ajoutes.\n" +
                         "Lecture : Media3 (Android), libVLC (ordinateur).",
                     color = Cm.TextMuted,

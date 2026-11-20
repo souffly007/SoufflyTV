@@ -18,8 +18,18 @@ import fr.bonobo.soufflytv.data.parseXmltvTime
 import fr.bonobo.soufflytv.data.parseXtreamUrl
 import fr.bonobo.soufflytv.data.stalkerEndpoints
 import fr.bonobo.soufflytv.model.ItemType
+import fr.bonobo.soufflytv.model.Source
+import fr.bonobo.soufflytv.data.AccountBackup
+import fr.bonobo.soufflytv.data.AccountBackupCodec
+import fr.bonobo.soufflytv.data.BackupException
+import fr.bonobo.soufflytv.data.backupFileName
+import fr.bonobo.soufflytv.data.civilFromDays
+import fr.bonobo.soufflytv.player.TrackOption
+import fr.bonobo.soufflytv.player.isAudioDescription
+import fr.bonobo.soufflytv.player.pickAudioTrack
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -164,5 +174,41 @@ class ParsersTest {
         assertEquals("france2", epgBaseName("|FR| FRANCE 2 SD"))
         assertEquals("tf1seriesfilms", epgBaseName("|FR| TF1 SERIES FILMS HD"))
         assertEquals("canalsport", epgBaseName("|FR| CANAL+ SPORT FHD"))
+    }
+
+    @Test
+    fun audioDescription() {
+        assertTrue(isAudioDescription("Audiodescription", null))
+        assertTrue(isAudioDescription("Français (AD)", "fra"))
+        assertTrue(isAudioDescription(null, "qad"))
+        assertTrue(isAudioDescription("Piste 2 - [qad]", null))
+        assertFalse(isAudioDescription("Français", "fra"))
+        assertFalse(isAudioDescription("Adventure", null))
+
+        val tracks = listOf(
+            TrackOption("0", "Français", selected = false, language = "fra"),
+            TrackOption("1", "Français AD", selected = true, language = "fra", audioDescription = true),
+            TrackOption("2", "Anglais", selected = false, language = "eng"),
+        )
+        assertEquals("0", pickAudioTrack(tracks, wantAudioDescription = false)?.id)
+        assertEquals(null, pickAudioTrack(tracks, wantAudioDescription = true))
+    }
+
+    @Test
+    fun accountBackup() {
+        assertEquals("SoufflyTV-comptes-1970-01-01.json", backupFileName(0))
+        assertEquals(Triple(2024, 2, 29), civilFromDays(19_782))
+
+        val sources = listOf(
+            Source.Xtream("x1", "Mon Xtream", "http://exemple.com:8080", "franck", "motdepasse"),
+            Source.M3u("m1", "Playlist", "http://exemple.com/liste.m3u", null, null),
+        )
+        val text = AccountBackupCodec.encode(AccountBackup(1L, sources, mapOf("p.m3u" to "#EXTM3U")), "secret123")
+        assertFalse("motdepasse" in text) // identifiants illisibles sans le mot de passe
+        val restored = AccountBackupCodec.decode(text, "secret123")
+        assertEquals(sources, restored.sources)
+        assertEquals("#EXTM3U", restored.playlists["p.m3u"])
+        assertFailsWith<BackupException> { AccountBackupCodec.decode(text, "mauvais") }
+        assertFailsWith<BackupException> { AccountBackupCodec.decode("pas une sauvegarde", "secret123") }
     }
 }

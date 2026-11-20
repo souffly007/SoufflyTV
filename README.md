@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.5.3 && git push origin v0.5.3
+git tag v0.6.0 && git push origin v0.6.0
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -142,6 +142,10 @@ powershell -ExecutionPolicy Bypass -File windows\build-windows.ps1
 
 Films et séries : ◀ ▶ = −10 s / +10 s, OK = commandes (barre de temps, sauts −10 min à +10 min).
 
+Champs de saisie à la télécommande : **▲ ▼** passent dessus comme sur un bouton, **OK** ouvre le clavier,
+« Terminé » ou **Retour** le referme ; appui long sur OK dans une recherche pour l'effacer.
+Mot de passe : case « Afficher le mot de passe » sous le champ.
+
 Sur grand écran, une **barre en haut** donne accès à l'Accueil, TV / Films / Séries, aux filtres de catégories
 et aux réglages (flèche haut depuis les catégories). Le focus revient toujours sur la catégorie, la saison, l'épisode ou la source d'où l'on vient.
 
@@ -150,19 +154,20 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
 - **PC** : `Entrée` = liste des chaînes (à gauche de la vidéo), `Échap` = retour, `F` = plein écran,
   `↑ ↓` ou `+ −` = zapping, `Espace` = pause.
 
-## Fonctions (v0.5)
+## Fonctions (v0.6)
 
 **Sources**
 - [x] M3U par **lien ou fichier importé** (attributs `tvg-*`, `group-title`, `#EXTGRP`, `#EXTVLCOPT`)
 - [x] Xtream : TV en direct, **films**, **séries** (saisons et épisodes)
 - [x] Stalker : TV en direct, **films (VOD)**, **séries** (module « series » ou séries rangées dans la VOD), reconnexion si le jeton expire, **options avancées** (SN, device ID, signature)
 - [x] Test de connexion, **modification** d'une source existante
+- [x] **Sauvegarde des comptes** dans un fichier chiffré par mot de passe (PBKDF2 + AES-256-GCM), restauration depuis un fichier ou un lien (pratique pour une TV sans explorateur de fichiers) ; même format sur Android, TV et PC
 - [x] Identifiants **chiffrés** sur Android (AES-256-GCM, clé dans l'Android Keystore) ; fichier en droits 600 sur PC
 
 **Guide TV**
 - [x] XMLTV pour les playlists M3U (lien saisi ou `url-tvg` de la playlist), gzip pris en charge, lu en flux
 - [x] Xtream : guide complet `xmltv.php` (émission en cours dans les listes), repli sur `get_short_epg` ; Stalker : `get_short_epg`
-- [x] « Maintenant / Ensuite » avec barre de progression dans le lecteur, émission en cours dans les listes
+- [x] « Maintenant / Ensuite » avec résumé de l'émission et barre de progression dans le lecteur, émission en cours dans les listes
 - [x] Guide **enregistré sur l'appareil** (affiché dès l'ouverture), rafraîchi en arrière-plan toutes les 6 h
 - [x] Guide **partagé entre les versions** d'une même chaîne (TF1 SD / HD / FHD / 4K…)
 
@@ -175,6 +180,7 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
 - [x] Commandes par-dessus l'image, masquées après 5 s (Android)
 - [x] Pause, barre de progression utilisable à la télécommande, sauts −10 min / −1 min / −10 s / +10 s / +1 min / +10 min, épisode précédent/suivant, **épisode suivant automatique**
 - [x] **Son Dolby (AC3, E-AC3), DTS, TrueHD** sur tous les appareils Android (décodeur FFmpeg en secours de ceux de l'appareil)
+- [x] **Audiodescription** (voix qui décrit l'image) : désactivée par défaut, bouton **AD** dans le lecteur quand la chaîne en propose une, réglage pour l'avoir toujours
 - [x] Choix de la **piste audio** et des **sous-titres**, **format d'image** (Original, 16:9, Zoom)
 - [x] **Image dans l'image** (bouton ou touche Accueil), paysage automatique, écran toujours allumé
 - [x] **Reconnexion automatique** du direct (3 essais), mémoire tampon réglable

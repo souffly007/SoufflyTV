@@ -18,11 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,8 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -115,7 +113,7 @@ fun AddSourceScreen(state: AppState, editing: Source?) {
     var test by remember { mutableStateOf<TestResult?>(null) }
     val scope = rememberCoroutineScope()
 
-    val picker = rememberFilePicker { picked ->
+    val picker = rememberFilePicker(title = "Choisir une playlist M3U") { picked ->
         if (picked == null) {
             importing = false
             return@rememberFilePicker
@@ -210,7 +208,12 @@ fun AddSourceScreen(state: AppState, editing: Source?) {
                                 } else {
                                     TextButton(onClick = {
                                         importing = true
-                                        picker()
+                                        if (!picker()) {
+                                            importing = false
+                                            test = TestResult.Failed(
+                                                "Pas d'explorateur de fichiers sur cet appareil : utilise plutôt un lien vers la playlist",
+                                            )
+                                        }
                                     }) { Text(if (localFileName == null) "Choisir" else "Changer") }
                                 }
                             }
@@ -354,32 +357,39 @@ private fun Field(
     supporting: String? = null,
 ) {
     var visible by remember { mutableStateOf(false) }
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        shape = RoundedCornerShape(12.dp),
-        label = { Text(label) },
-        placeholder = if (placeholder.isNotEmpty()) {
-            { Text(placeholder, color = Cm.TextMuted.copy(alpha = 0.7f)) }
-        } else null,
-        isError = isError,
-        supportingText = if (supporting != null) {
-            { Text(supporting) }
-        } else null,
-        keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboardType),
-        visualTransformation = if (password && !visible) PasswordVisualTransformation() else VisualTransformation.None,
-        trailingIcon = if (password) {
-            {
-                IconButton(onClick = { visible = !visible }) {
-                    Icon(
-                        AppIcons.Visibility,
-                        contentDescription = if (visible) "Masquer" else "Afficher",
-                        tint = if (visible) Cm.Cyan else Cm.TextMuted,
-                    )
-                }
+    Column {
+        RemoteTextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = label,
+            placeholder = placeholder,
+            hidden = password && !visible,
+            // Mot de passe affiché : clavier ordinaire, pour que le texte tapé reste lisible dans le clavier
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (password && !visible) KeyboardType.Password else keyboardType,
+                autoCorrectEnabled = false,
+            ),
+            isError = isError,
+            supporting = supporting,
+        )
+        if (password) {
+            // Case à part, atteignable avec ▼ depuis le champ (l'œil dans le champ ne l'est pas à la télécommande)
+            Row(
+                Modifier
+                    .padding(top = 4.dp)
+                    .tvClickable { visible = !visible }
+                    .padding(end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // La ligne entière est cliquable : la case n'est qu'un témoin (un seul arrêt du focus)
+                Checkbox(
+                    checked = visible,
+                    onCheckedChange = null,
+                    colors = CheckboxDefaults.colors(checkedColor = Cm.Cyan, checkmarkColor = Cm.OnCyan),
+                )
+                Text("Afficher le mot de passe", color = Cm.Text, fontSize = 14.sp)
             }
-        } else null,
-    )
+        }
+    }
 }

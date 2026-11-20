@@ -115,6 +115,9 @@ actual fun VideoPlayer(
     }
 
     DisposableEffect(vlc) {
+        // Nouvelle chaîne : les pistes de la précédente ne valent plus
+        controller.audioTracks = emptyList()
+        controller.textTracks = emptyList()
         val listener = object : MediaPlayerEventAdapter() {
             override fun buffering(mediaPlayer: MediaPlayer?, newCache: Float) {
                 post(if (newCache < 100f) PlayerStatus.Loading else PlayerStatus.Playing)
@@ -188,7 +191,19 @@ actual fun VideoPlayer(
                 val audioCurrent = player.audio().track()
                 val audio = player.audio().trackDescriptions()
                     .filter { it.id() >= 0 }
-                    .map { TrackOption(it.id().toString(), it.description() ?: "Piste ${it.id()}", it.id() == audioCurrent) }
+                    .map {
+                        val description = it.description() ?: "Piste ${it.id()}"
+                        val described = isAudioDescription(description, null)
+                        TrackOption(
+                            id = it.id().toString(),
+                            label = if (described && !description.contains("audiodescription", ignoreCase = true)) {
+                                "Audiodescription · $description"
+                            } else description,
+                            selected = it.id() == audioCurrent,
+                            language = LANGUAGE_IN_BRACKETS.find(description)?.groupValues?.get(1)?.lowercase(),
+                            audioDescription = described,
+                        )
+                    }
                 if (audio != controller.audioTracks) controller.audioTracks = audio
 
                 val textCurrent = player.subpictures().track()
@@ -226,3 +241,6 @@ actual fun VideoPlayer(
         modifier = modifier,
     )
 }
+
+/** VLC décrit une piste par « Piste 1 - [Français] » : la langue est entre crochets. */
+private val LANGUAGE_IN_BRACKETS = Regex("""\[([^\]]+)]\s*$""")

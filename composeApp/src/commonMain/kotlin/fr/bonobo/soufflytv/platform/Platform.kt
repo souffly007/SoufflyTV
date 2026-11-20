@@ -42,9 +42,35 @@ expect fun FullscreenEffect(landscape: Boolean)
 
 class PickedFile(val name: String, val content: String)
 
-/** Renvoie une fonction qui ouvre le sélecteur de fichiers du système. */
+/**
+ * Renvoie une fonction qui ouvre le sélecteur de fichiers du système.
+ * Elle renvoie false si l'appareil n'en a pas (beaucoup de téléviseurs Android).
+ */
 @Composable
-expect fun rememberFilePicker(onPicked: (PickedFile?) -> Unit): () -> Unit
+expect fun rememberFilePicker(title: String = "Choisir un fichier", onPicked: (PickedFile?) -> Unit): () -> Boolean
+
+sealed interface SaveResult {
+    /** [where] : nom ou emplacement du fichier enregistré, à montrer à l'utilisateur. */
+    data class Saved(val where: String) : SaveResult
+    data object Cancelled : SaveResult
+    data class Failed(val message: String) : SaveResult
+}
+
+/**
+ * Renvoie une fonction qui enregistre un fichier texte là où l'utilisateur le choisit.
+ * Sans explorateur de fichiers (téléviseurs), Android le range dans Téléchargements.
+ */
+@Composable
+expect fun rememberFileSaver(onSaved: (SaveResult) -> Unit): (fileName: String, content: String) -> Unit
+
+/** Sauvegardes : clé tirée du mot de passe (PBKDF2-HMAC-SHA256), chiffrement AES-256-GCM. */
+expect fun passwordEncrypt(data: ByteArray, password: String, salt: ByteArray, iv: ByteArray, iterations: Int): ByteArray
+
+/** Lève une exception si le mot de passe est faux ou le fichier modifié (contrôle GCM). */
+expect fun passwordDecrypt(data: ByteArray, password: String, salt: ByteArray, iv: ByteArray, iterations: Int): ByteArray
+
+/** Octets aléatoires sûrs (sel, vecteur d'initialisation). */
+expect fun secureRandomBytes(size: Int): ByteArray
 
 /** Touches dédiées CH+ / CH- de la télécommande : +1, -1, sinon 0. */
 expect fun KeyEvent.channelKeyDelta(): Int

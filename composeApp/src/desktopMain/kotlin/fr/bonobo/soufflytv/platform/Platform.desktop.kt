@@ -155,12 +155,12 @@ actual fun formatClock(epochMillis: Long): String =
 actual fun FullscreenEffect(landscape: Boolean) = Unit
 
 @Composable
-actual fun rememberFilePicker(onPicked: (PickedFile?) -> Unit): () -> Unit {
+actual fun rememberFilePicker(title: String, onPicked: (PickedFile?) -> Unit): () -> Boolean {
     val scope = rememberCoroutineScope()
     val callback by rememberUpdatedState(onPicked)
     return remember {
         {
-            val dialog = FileDialog(null as Frame?, "Choisir une playlist M3U", FileDialog.LOAD)
+            val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD)
             dialog.isVisible = true // fenêtre modale
             val file = dialog.file?.let { File(dialog.directory, it) }
             if (file == null) {
@@ -171,6 +171,34 @@ actual fun rememberFilePicker(onPicked: (PickedFile?) -> Unit): () -> Unit {
                         runCatching { PickedFile(file.name, file.readText()) }.getOrNull()
                     }
                     callback(picked)
+                }
+            }
+            true
+        }
+    }
+}
+
+@Composable
+actual fun rememberFileSaver(onSaved: (SaveResult) -> Unit): (fileName: String, content: String) -> Unit {
+    val scope = rememberCoroutineScope()
+    val callback by rememberUpdatedState(onSaved)
+    return remember {
+        { fileName, content ->
+            val dialog = FileDialog(null as Frame?, "Enregistrer la sauvegarde", FileDialog.SAVE)
+            dialog.file = fileName
+            dialog.isVisible = true // fenêtre modale
+            val file = dialog.file?.let { File(dialog.directory, it) }
+            if (file == null) {
+                callback(SaveResult.Cancelled)
+            } else {
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching { file.writeText(content) }.fold(
+                            onSuccess = { SaveResult.Saved(file.absolutePath) },
+                            onFailure = { SaveResult.Failed("Enregistrement impossible : ${it.message}") },
+                        )
+                    }
+                    callback(result)
                 }
             }
         }

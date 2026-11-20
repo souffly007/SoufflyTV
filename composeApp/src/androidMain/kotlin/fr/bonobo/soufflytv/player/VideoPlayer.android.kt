@@ -52,6 +52,9 @@ actual fun VideoPlayer(
     val player = remember(request) { buildPlayer(context, request, options) }
 
     DisposableEffect(player) {
+        // Nouvelle chaîne : les pistes de la précédente ne valent plus
+        controller.audioTracks = emptyList()
+        controller.textTracks = emptyList()
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
@@ -216,17 +219,27 @@ private fun trackOptions(tracks: Tracks, type: Int): List<TrackOption> {
         if (group.type != type) return@forEachIndexed
         for (trackIndex in 0 until group.length) {
             if (!group.isTrackSupported(trackIndex)) continue
-            val label = trackLabel(group.getTrackFormat(trackIndex), result.size + 1)
-            result += TrackOption("$groupIndex:$trackIndex", label, group.isTrackSelected(trackIndex))
+            val format = group.getTrackFormat(trackIndex)
+            val described = type == C.TRACK_TYPE_AUDIO && (
+                (format.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO) != 0 || isAudioDescription(format.label, format.language)
+            )
+            val label = trackLabel(format, result.size + 1, described)
+            result += TrackOption(
+                id = "$groupIndex:$trackIndex",
+                label = label,
+                selected = group.isTrackSelected(trackIndex),
+                language = format.language?.takeIf { it.isNotBlank() && it != "und" },
+                audioDescription = described,
+            )
         }
     }
     return result
 }
 
 @OptIn(UnstableApi::class)
-private fun trackLabel(format: Format, number: Int): String {
+private fun trackLabel(format: Format, number: Int, audioDescription: Boolean = false): String {
     val language = format.language
-        ?.takeIf { it.isNotBlank() && it != "und" }
+        ?.takeIf { it.isNotBlank() && it != "und" && it != "qad" }
         ?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.FRENCH) }
         ?.replaceFirstChar { it.uppercase() }
     val channels = when (format.channelCount) {
@@ -236,7 +249,7 @@ private fun trackLabel(format: Format, number: Int): String {
         8 -> "7.1"
         else -> null
     }
-    return listOfNotNull(format.label, language, channels)
+    return listOfNotNull(if (audioDescription) "Audiodescription" else null, format.label, language, channels)
         .distinct()
         .joinToString(" · ")
         .ifEmpty { "Piste $number" }

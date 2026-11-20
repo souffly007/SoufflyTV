@@ -81,8 +81,8 @@ android {
         applicationId = "fr.bonobo.soufflytv"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 12
-        versionName = "0.5.3"
+        versionCode = 15
+        versionName = "0.6.0"
     }
     buildFeatures {
         buildConfig = true
