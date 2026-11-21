@@ -204,3 +204,18 @@ actual fun rememberFileSaver(onSaved: (SaveResult) -> Unit): (fileName: String, 
         }
     }
 }
+
+@Composable
+actual fun rememberUrlOpener(): (url: String) -> Boolean = remember {
+    { url ->
+        val linux = System.getProperty("os.name").orEmpty().lowercase().contains("linux")
+        runCatching {
+            if (linux) {
+                // xdg-open passe par le portail dans le Flatpak : le navigateur par défaut s'ouvre
+                ProcessBuilder("xdg-open", url).start()
+            } else {
+                java.awt.Desktop.getDesktop().browse(java.net.URI(url))
+            }
+        }.isSuccess
+    }
+}

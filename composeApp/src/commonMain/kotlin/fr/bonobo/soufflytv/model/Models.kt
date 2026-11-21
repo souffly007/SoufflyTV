@@ -84,6 +84,8 @@ data class Channel(
     val tvgId: String? = null,
     /** Note sur 10 donnée par la source (films et séries), affichée sur l'affiche. */
     val rating: String? = null,
+    /** Date d'ajout chez le fournisseur (ms), pour les « Nouveautés » de l'accueil. */
+    val added: Long? = null,
 )
 
 /** Une émission du guide TV (heures en millisecondes UTC). */
@@ -110,6 +112,7 @@ data class SeriesInfo(
     val backdrop: String? = null,
     val director: String? = null,
     val cast: String? = null,
+    val trailer: String? = null,
 )
 
 /** Fiche d'un film : résumé, année, genre, durée… (les champs absents restent à null). */
@@ -123,6 +126,8 @@ data class MovieInfo(
     val meta: String? = null,
     val director: String? = null,
     val cast: String? = null,
+    /** Lien de la bande-annonce (YouTube), si la source en donne une. */
+    val trailer: String? = null,
 )
 
 /** Ce que le lecteur doit ouvrir. */

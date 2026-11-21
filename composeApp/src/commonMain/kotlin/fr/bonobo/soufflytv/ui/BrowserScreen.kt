@@ -1,6 +1,7 @@
 package fr.bonobo.soufflytv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -93,39 +94,62 @@ fun BrowserScreen(state: AppState, source: Source) {
 
         val manage = { state.navigate(Screen.ManageCategories(source, model.section)) }
 
-        Column(Modifier.fillMaxSize()) {
-            if (wide) {
-                // Grand écran : une seule barre (logo, rubriques, compte, filtres, réglages)
-                TopNavBar(
+        if (wide) {
+            // Grand écran : barre latérale (Accueil, TV, Films, Séries, Filtres, Réglages, compte)
+            // et, à droite, l'accueil de contenus ou la rubrique choisie
+            val remote = remoteNavigation()
+            Box(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxSize()) {
+                    // À la télécommande, la barre repliée (icônes) se déplie par-dessus le contenu
+                    Spacer(Modifier.width(if (remote) RAIL_COLLAPSED else RAIL_EXPANDED).fillMaxHeight())
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        val error = model.error
+                        when {
+                            model.showHome -> HomePage(state, source, model, Modifier.fillMaxSize())
+                            model.categoriesLoading && !model.loadedOnce -> LoadingBox("Connexion à la source…")
+                            error != null && !model.loadedOnce -> ErrorBox(error, onRetry = model::retry)
+                            else -> Row(Modifier.fillMaxSize()) {
+                                CategoryPane(model, Modifier.width(240.dp).fillMaxHeight())
+                                Box(Modifier.width(1.dp).fillMaxHeight().background(Cm.Outline))
+                                ChannelPane(state, source, model, Modifier.weight(1f).fillMaxHeight(), showBack = false, wide = true)
+                            }
+                        }
+                    }
+                }
+                SideRail(
                     source = source,
                     model = model,
-                    onHome = { state.home() },
+                    remote = remote,
+                    onAccounts = { state.home() },
                     onManage = manage,
                     onSettings = { state.navigate(Screen.Settings) },
                 )
-            } else {
-                TopBar(
-                    title = source.name,
-                    subtitle = "${source.kindLabel} · ${source.detail}",
-                    onBack = { state.back() },
-                    actions = {
-                        if (model.loadedOnce) {
-                            TextButtonIcon(
-                                label = if (model.hiddenCount > 0) "Catégories (${model.hiddenCount} masquées)" else "Catégories",
-                                showLabel = false,
-                                onClick = manage,
-                            )
-                        }
-                    },
-                )
-                if (model.sections.size > 1) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        model.sections.forEach { s ->
-                            Pill(s.label, selected = s == model.section) { model.selectSection(s) }
-                        }
+            }
+            return@BoxWithConstraints
+        }
+
+        Column(Modifier.fillMaxSize()) {
+            TopBar(
+                title = source.name,
+                subtitle = "${source.kindLabel} · ${source.detail}",
+                onBack = { state.back() },
+                actions = {
+                    if (model.loadedOnce) {
+                        TextButtonIcon(
+                            label = if (model.hiddenCount > 0) "Catégories (${model.hiddenCount} masquées)" else "Catégories",
+                            showLabel = false,
+                            onClick = manage,
+                        )
+                    }
+                },
+            )
+            if (model.sections.size > 1) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    model.sections.forEach { s ->
+                        Pill(s.label, selected = s == model.section) { model.selectSection(s) }
                     }
                 }
             }
@@ -135,11 +159,6 @@ fun BrowserScreen(state: AppState, source: Source) {
                 when {
                     model.categoriesLoading && !model.loadedOnce -> LoadingBox("Connexion à la source…")
                     error != null && !model.loadedOnce -> ErrorBox(error, onRetry = model::retry)
-                    wide -> Row(Modifier.fillMaxSize()) {
-                        CategoryPane(model, Modifier.width(240.dp).fillMaxHeight())
-                        Box(Modifier.width(1.dp).fillMaxHeight().background(Cm.Outline))
-                        ChannelPane(state, source, model, Modifier.weight(1f).fillMaxHeight(), showBack = false, wide = true)
-                    }
                     model.showChannels -> ChannelPane(state, source, model, Modifier.fillMaxSize(), showBack = true, wide = false)
                     else -> CategoryPane(model, Modifier.fillMaxSize())
                 }
@@ -148,91 +167,124 @@ fun BrowserScreen(state: AppState, source: Source) {
     }
 }
 
+private val RAIL_COLLAPSED = 76.dp
+private val RAIL_EXPANDED = 216.dp
+
 /**
- * Barre du haut, esprit Souffly : SoufflyTV · Accueil · TV · Films · Séries … compte · Filtres · Réglages.
- * À la télécommande : flèche haut depuis les catégories pour l'atteindre.
+ * Barre latérale, esprit Souffly : logo, heure, Accueil · TV en direct · Films · Séries,
+ * puis Filtres, Réglages et le compte en cours (changer de compte).
+ * À la télécommande : repliée en icônes, elle se déplie quand on y entre (◀ depuis le contenu).
  */
 @Composable
-private fun TopNavBar(
+private fun SideRail(
     source: Source,
     model: BrowserModel,
-    onHome: () -> Unit,
+    remote: Boolean,
+    onAccounts: () -> Unit,
     onManage: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    var hasFocus by remember { mutableStateOf(false) }
+    val expanded = !remote || hasFocus
+    var clock by remember { mutableStateOf(formatClock(nowMillis())) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            clock = formatClock(nowMillis())
+            delay(20_000)
+        }
+    }
+
+    Row(Modifier.fillMaxHeight()) {
+        Column(
+            Modifier
+                .width(if (expanded) RAIL_EXPANDED else RAIL_COLLAPSED)
+                .fillMaxHeight()
+                .background(Cm.Surface)
+                .onFocusChanged { hasFocus = it.hasFocus }
+                .onPreviewKeyEvent { event ->
+                    // ▶ : retour dans le contenu, sur la catégorie ou la carte d'où l'on vient
+                    event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight &&
+                        model.enterContent?.invoke() == true
+                }
+                .padding(horizontal = 10.dp, vertical = 14.dp),
         ) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("Souffly", color = Cm.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("TV", color = Cm.Cyan, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            // Logo et heure
+            Row(Modifier.padding(start = 8.dp, bottom = 18.dp), verticalAlignment = Alignment.Bottom) {
+                Text("S", color = Cm.Cyan, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                if (expanded) {
+                    Text("oufflyTV", color = Cm.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.weight(1f))
+                    Text(clock, style = MonoLabel, color = Cm.TextMuted)
+                }
             }
-            Spacer(Modifier.width(24.dp))
-            NavTab(AppIcons.Home, "Accueil", selected = false, onClick = onHome)
+            RailItem(AppIcons.Home, "Accueil", expanded, selected = model.showHome) { model.goHome() }
             model.sections.forEach { s ->
                 val (icon, label) = when (s) {
-                    Section.LIVE -> AppIcons.Tv to "TV"
+                    Section.LIVE -> AppIcons.Tv to "TV en direct"
                     Section.MOVIES -> AppIcons.Movie to "Films"
                     Section.SERIES -> AppIcons.Library to "Séries"
                 }
-                NavTab(icon, label, selected = s == model.section) { model.selectSection(s) }
+                RailItem(icon, label, expanded, selected = !model.showHome && s == model.section) { model.selectSection(s) }
             }
             Spacer(Modifier.weight(1f))
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 12.dp)) {
-                Text(source.name, color = Cm.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Text(source.kindLabel, style = MonoLabel, color = Cm.TextMuted)
-            }
-            NavTab(
+            RailItem(
                 AppIcons.Filter,
                 if (model.hiddenCount > 0) "Filtres (${model.hiddenCount})" else "Filtres",
+                expanded,
                 selected = false,
                 onClick = onManage,
             )
-            NavTab(AppIcons.Settings, null, selected = false, onClick = onSettings)
+            RailItem(AppIcons.Settings, "Réglages", expanded, selected = false, onClick = onSettings)
+            Spacer(Modifier.height(6.dp))
+            // Compte en cours : changer de compte
+            Row(
+                Modifier.fillMaxWidth().tvClickable(onClick = onAccounts).padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(34.dp).background(Cm.CyanGlow, RoundedCornerShape(50)).border(1.dp, Cm.Cyan, RoundedCornerShape(50)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(source.name.take(1).uppercase(), color = Cm.Cyan, fontWeight = FontWeight.Bold)
+                }
+                if (expanded) {
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(source.name, color = Cm.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Changer de compte", color = Cm.TextMuted, fontSize = 11.sp, maxLines = 1)
+                    }
+                }
+            }
         }
-        CyanLine()
+        // liseré cyan, façon CyanogenMod
+        Box(Modifier.width(1.dp).fillMaxHeight().background(Cm.Cyan.copy(alpha = 0.5f)))
     }
 }
 
 @Composable
-private fun NavTab(
+private fun RailItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String?,
+    label: String,
+    expanded: Boolean,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    Column(
-        Modifier.padding(horizontal = 3.dp).tvClickable(selected = selected, onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp).tvClickable(selected = selected, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                icon,
-                contentDescription = label ?: "Réglages",
-                tint = if (selected) Cm.Cyan else Cm.TextMuted,
-                modifier = Modifier.size(20.dp),
+        Icon(icon, contentDescription = label, tint = if (selected) Cm.Cyan else Cm.TextMuted, modifier = Modifier.size(24.dp))
+        if (expanded) {
+            Spacer(Modifier.width(14.dp))
+            Text(
+                label,
+                color = if (selected) Cm.Cyan else Cm.Text,
+                fontSize = 15.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
             )
-            if (label != null) {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    label,
-                    color = if (selected) Cm.Cyan else Cm.Text,
-                    fontSize = 15.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                )
-            }
         }
-        // Soulignement cyan de la rubrique active
-        Box(
-            Modifier.width(28.dp).height(3.dp)
-                .background(if (selected) Cm.Cyan else Color.Transparent, RoundedCornerShape(2.dp))
-        )
     }
 }
 
@@ -254,6 +306,11 @@ private fun CategoryPane(model: BrowserModel, modifier: Modifier) {
             }
         },
     )
+
+    DisposableEffect(model) {
+        model.enterContent = { runCatching { selectedFocus.requestFocus() }.isSuccess }
+        onDispose { model.enterContent = null }
+    }
 
     LazyColumn(
         modifier.onPreviewKeyEvent { event ->
@@ -632,7 +689,7 @@ private fun ChannelRow(
 }
 
 @Composable
-private fun PosterCard(
+internal fun PosterCard(
     item: Channel,
     favorite: Boolean,
     focusModifier: Modifier = Modifier,

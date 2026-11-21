@@ -1,6 +1,7 @@
 package fr.bonobo.soufflytv.data
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import fr.bonobo.soufflytv.model.Channel
@@ -30,6 +31,12 @@ internal data class LibraryFile(
     val positions: Map<String, Long> = emptyMap(),
     /** Catégories masquées : "sourceId|RUBRIQUE|categoryId". */
     val hidden: List<String> = emptyList(),
+    /** Durée des films/épisodes commencés (barre de progression) : "sourceId|channelId" → ms. */
+    val durations: Map<String, Long> = emptyMap(),
+    /** Films/épisodes vus jusqu'au bout : "sourceId|channelId". */
+    val watched: List<String> = emptyList(),
+    /** Dernière fois qu'un film/épisode a été regardé (reprise d'une série) : "sourceId|channelId" → date. */
+    val lastPlayed: Map<String, Long> = emptyMap(),
 )
 
 /** Favoris, dernières chaînes regardées, positions de reprise et catégories masquées (library.json). */
@@ -47,6 +54,15 @@ class LibraryStore(private val scope: CoroutineScope) {
         private set
 
     private val positions = HashMap<String, Long>()
+    private val durations = HashMap<String, Long>()
+    private val lastPlayed = HashMap<String, Long>()
+
+    /** Films/épisodes vus jusqu'au bout : "sourceId|channelId". */
+    var watched by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    /** Change à chaque enregistrement de progression : les écrans qui la lisent se mettent à jour. */
+    private var progressVersion by mutableIntStateOf(0)
     private var saveJob: Job? = null
 
     suspend fun load() {
@@ -57,6 +73,9 @@ class LibraryStore(private val scope: CoroutineScope) {
             recents = data.recents
             positions.putAll(data.positions)
             hidden = data.hidden.toSet()
+            durations.putAll(data.durations)
+            watched = data.watched.toSet()
+            lastPlayed.putAll(data.lastPlayed)
         } catch (e: Exception) {
             // bibliothèque illisible : on repart de zéro sans bloquer l'app
         }
@@ -81,10 +100,49 @@ class LibraryStore(private val scope: CoroutineScope) {
         scheduleSave()
     }
 
-    fun position(key: String): Long? = positions[key]
+    fun position(key: String): Long? {
+        progressVersion // lecture d'un état : recomposition quand la progression change
+        return positions[key]
+    }
 
     fun setPosition(key: String, ms: Long) {
         if (ms <= 0) positions.remove(key) else positions[key] = ms
+        progressVersion++
+        scheduleSave()
+    }
+
+    /** Part déjà regardée (0 à 1) d'un film ou d'un épisode commencé, ou null. */
+    fun progress(key: String): Float? {
+        progressVersion
+        val position = positions[key] ?: return null
+        val duration = durations[key]?.takeIf { it > 0 } ?: return null
+        return (position.toFloat() / duration).coerceIn(0f, 1f)
+    }
+
+    fun isWatched(key: String): Boolean = key in watched
+
+    /** Date à laquelle ce film ou cet épisode a été regardé pour la dernière fois, ou null. */
+    fun lastPlayed(key: String): Long? {
+        progressVersion
+        return lastPlayed[key]
+    }
+
+    /**
+     * Enregistre où l'on en est. Dans la dernière minute (ou les 5 derniers %),
+     * le film ou l'épisode est marqué « vu » et sa position oubliée.
+     */
+    fun saveProgress(key: String, positionMs: Long, durationMs: Long) {
+        if (durationMs <= 0) return
+        val finished = positionMs > durationMs - 60_000 || positionMs > durationMs * 0.95
+        if (finished) {
+            positions.remove(key)
+            watched = watched + key
+        } else if (positionMs > 0) {
+            positions[key] = positionMs
+        }
+        durations[key] = durationMs
+        lastPlayed[key] = nowMillis()
+        progressVersion++
         scheduleSave()
     }
 
@@ -109,6 +167,10 @@ class LibraryStore(private val scope: CoroutineScope) {
     fun clearHistory() {
         recents = emptyList()
         positions.clear()
+        durations.clear()
+        lastPlayed.clear()
+        watched = emptySet()
+        progressVersion++
         scheduleSave()
     }
 
@@ -116,6 +178,9 @@ class LibraryStore(private val scope: CoroutineScope) {
         favorites = favorites.filterNot { it.sourceId == sourceId }
         recents = recents.filterNot { it.sourceId == sourceId }
         positions.keys.removeAll { it.startsWith("$sourceId|") }
+        durations.keys.removeAll { it.startsWith("$sourceId|") }
+        lastPlayed.keys.removeAll { it.startsWith("$sourceId|") }
+        watched = watched.filterNot { it.startsWith("$sourceId|") }.toSet()
         hidden = hidden.filterNot { it.startsWith("$sourceId|") }.toSet()
         scheduleSave()
     }
@@ -124,7 +189,15 @@ class LibraryStore(private val scope: CoroutineScope) {
         saveJob?.cancel()
         saveJob = scope.launch {
             delay(400)
-            val data = LibraryFile(favorites, recents, positions.toMap(), hidden.toList())
+            val data = LibraryFile(
+                favorites = favorites,
+                recents = recents,
+                positions = positions.toMap(),
+                hidden = hidden.toList(),
+                durations = durations.toMap(),
+                watched = watched.toList(),
+                lastPlayed = lastPlayed.toMap(),
+            )
             writeAppFile(FILE, json.encodeToString(LibraryFile.serializer(), data))
         }
     }

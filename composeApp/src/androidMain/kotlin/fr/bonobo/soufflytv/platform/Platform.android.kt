@@ -2,6 +2,7 @@ package fr.bonobo.soufflytv.platform
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.ContentValues
 import android.content.ActivityNotFoundException
 import android.content.ContextWrapper
@@ -262,6 +263,24 @@ actual fun rememberFileSaver(onSaved: (SaveResult) -> Unit): (fileName: String, 
                 // Téléviseur sans explorateur : directement dans Téléchargements
                 pending[0] = null
                 scope.launch { callback(withContext(Dispatchers.IO) { saveToDownloads(context, fileName, content) }) }
+            }
+        }
+    }
+}
+
+@Composable
+actual fun rememberUrlOpener(): (url: String) -> Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        { url ->
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                true
+            } catch (e: ActivityNotFoundException) {
+                false
+            } catch (e: SecurityException) {
+                false
             }
         }
     }

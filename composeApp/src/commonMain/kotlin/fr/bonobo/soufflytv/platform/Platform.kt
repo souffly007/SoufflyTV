@@ -63,6 +63,13 @@ sealed interface SaveResult {
 @Composable
 expect fun rememberFileSaver(onSaved: (SaveResult) -> Unit): (fileName: String, content: String) -> Unit
 
+/**
+ * Renvoie une fonction qui ouvre un lien hors de l'application (bande-annonce YouTube…) :
+ * l'appli YouTube sur Android et Android TV, le navigateur sur PC. Renvoie false en cas d'échec.
+ */
+@Composable
+expect fun rememberUrlOpener(): (url: String) -> Boolean
+
 /** Sauvegardes : clé tirée du mot de passe (PBKDF2-HMAC-SHA256), chiffrement AES-256-GCM. */
 expect fun passwordEncrypt(data: ByteArray, password: String, salt: ByteArray, iv: ByteArray, iterations: Int): ByteArray
 

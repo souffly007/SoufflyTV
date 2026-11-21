@@ -25,6 +25,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 const val ALL_CATEGORIES = "__all__"
+/** Nombre de cartes par rangée de l'accueil. */
+private const val HOME_ROW = 24
 const val FAVORITES = "__fav__"
 const val RECENTS = "__recent__"
 
@@ -71,6 +73,58 @@ class BrowserModel(
 
     /** Écran étroit : true quand la liste des chaînes remplace celle des catégories. */
     var showChannels by mutableStateOf(false)
+
+    // ---------- Accueil (grand écran) : À la une, Continuer à regarder, Nouveautés… ----------
+
+    /** Grand écran : la page d'accueil de contenus est affichée (sinon, une rubrique TV / Films / Séries). */
+    var showHome by mutableStateOf(true)
+    var homeNewMovies by mutableStateOf<List<Channel>>(emptyList())
+        private set
+    var homeNewSeries by mutableStateOf<List<Channel>>(emptyList())
+        private set
+    var homeTopMovies by mutableStateOf<List<Channel>>(emptyList())
+        private set
+    var homeLoading by mutableStateOf(false)
+        private set
+    private var homeLoaded = false
+    /** Carte ouverte depuis l'accueil (« rangée|id ») : au retour, le focus revient dessus. */
+    var homeReturnKey by mutableStateOf<String?>(null)
+
+    /** ▶ depuis la barre latérale : entre dans le contenu (catégories ou accueil). */
+    var enterContent: (() -> Boolean)? = null
+
+    fun goHome() {
+        showHome = true
+        homeReturnKey = null
+    }
+
+    /** Rangées de l'accueil : films et séries récents (date d'ajout du fournisseur), films les mieux notés. */
+    fun loadHome() {
+        if (homeLoaded) return
+        homeLoaded = true
+        homeLoading = true
+        scope.launch {
+            val all = Category(ALL_CATEGORIES, "")
+            if (Section.MOVIES in sections) {
+                safely { channelsFor(Section.MOVIES, all) }?.let { movies ->
+                    homeNewMovies = newest(movies)
+                    homeTopMovies = movies.filter { ratingOf(it) != null }
+                        .sortedByDescending { ratingOf(it) }
+                        .take(HOME_ROW)
+                }
+            }
+            if (Section.SERIES in sections) {
+                safely { channelsFor(Section.SERIES, all) }?.let { homeNewSeries = newest(it) }
+            }
+            homeLoading = false
+        }
+    }
+
+    private fun newest(list: List<Channel>): List<Channel> =
+        if (list.any { it.added != null }) list.sortedByDescending { it.added ?: 0L }.take(HOME_ROW) else list.take(HOME_ROW)
+
+    private fun ratingOf(item: Channel): Double? =
+        item.rating?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0.0 && it <= 10.0 }
 
     // ---------- Bandeau des films et séries (grand écran, façon TiviMate) ----------
 
@@ -151,6 +205,7 @@ class BrowserModel(
     }
 
     fun selectSection(target: Section) {
+        showHome = false
         if (target == section) return
         section = target
         providerCategories = emptyList()
@@ -208,6 +263,11 @@ class BrowserModel(
     fun consumeBack(): Boolean {
         if (!wide && showChannels) {
             showChannels = false
+            return true
+        }
+        // Grand écran : Retour depuis TV / Films / Séries ramène à l'accueil de contenus
+        if (wide && !showHome) {
+            goHome()
             return true
         }
         return false

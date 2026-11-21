@@ -194,3 +194,15 @@ fun movieMetaLine(year: String?, genre: String?, minutes: Int?, rating: String?)
         minutes?.let(::runtimeLabel),
         ratingLabel(rating),
     ).joinToString(" · ").ifEmpty { null }
+
+private val YOUTUBE_ID = Regex("^[A-Za-z0-9_-]{11}$")
+
+/** Bande-annonce fournie par la source : identifiant YouTube (« dQw4w9WgXcQ ») ou lien complet → lien. */
+fun trailerUrl(raw: String?): String? {
+    val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return when {
+        value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true) -> value
+        YOUTUBE_ID.matches(value) -> "https://www.youtube.com/watch?v=$value"
+        else -> null
+    }
+}

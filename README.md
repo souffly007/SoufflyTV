@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.6.6 && git push origin v0.6.6
+git tag v0.7.0 && git push origin v0.7.0
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -149,8 +149,10 @@ Champs de saisie à la télécommande : **▲ ▼** passent dessus comme sur un 
 « Terminé » ou **Retour** le referme ; appui long sur OK dans une recherche pour l'effacer.
 Mot de passe : case « Afficher le mot de passe » sous le champ.
 
-Sur grand écran, une **barre en haut** donne accès à l'Accueil, TV / Films / Séries, aux filtres de catégories
-et aux réglages (flèche haut depuis les catégories). Le focus revient toujours sur la catégorie, la saison, l'épisode ou la source d'où l'on vient.
+Sur grand écran, une **barre latérale** (repliée en icônes à la télécommande, ◀ pour l'ouvrir) donne accès à l'**Accueil**,
+à TV en direct / Films / Séries, aux filtres, aux réglages et au changement de compte. L'**Accueil** présente un film « À la une »,
+puis les rangées Continuer à regarder, Chaînes récentes, Nouveaux films, Nouvelles séries, Films les mieux notés et Ma liste.
+Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur la catégorie, la carte, la saison, l'épisode ou la source d'où l'on vient.
 
 - **Téléphone** : bouton ☰ dans la barre du lecteur pour la liste des chaînes ; toucher l'image affiche les commandes,
   double-toucher à gauche/droite recule/avance de 10 s.
@@ -158,7 +160,7 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
   `↑ ↓` ou `+ −` = zapping, `Espace` = pause. En plein écran, la vidéo occupe tout l'écran et les barres
   reviennent quand la souris bouge. Réglage « Plein écran automatique » pour y passer dès la lecture.
 
-## Fonctions (v0.6)
+## Fonctions (v0.7)
 
 **Sources**
 - [x] M3U par **lien ou fichier importé** (attributs `tvg-*`, `group-title`, `#EXTGRP`, `#EXTVLCOPT`)
@@ -177,10 +179,12 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
 
 **Bibliothèque**
 - [x] **Bandeau façon TiviMate** (TV) : l'affiche sélectionnée est présentée en grand en haut (image, titre, année · genre · durée · note, distribution, résumé), compteur « 3 / 1017 », note sur chaque affiche
+- [x] **Bande-annonce** (Xtream) : bouton sur la fiche film et la série, ouvre YouTube (appli sur Android / TV, navigateur sur PC)
 - [x] **Fiche film** : affiche, année, genre, durée, note, résumé, réalisation et distribution, puis **Lecture** (ou **Reprendre** / **Depuis le début**)
 - [x] **Masquer des catégories** par source et par rubrique : par pays/groupe d'un coup (FR, UK, DE…), tout masquer / tout afficher, recherche, une par une
 - [x] Favoris et **Récents** par source (catégories en tête de liste), ligne « Reprendre » sur l'accueil
-- [x] **Reprise** des films et épisodes là où tu t'étais arrêté
+- [x] **Reprise** des films et épisodes là où tu t'étais arrêté : fiche film avec **Continuer** / **Reprendre du début** et barre de progression ;
+  séries avec bouton **Reprendre** (ou **Épisode suivant**) sous l'image, épisodes **vus** ✓ et **en cours** (barre de progression)
 
 **Lecteur**
 - [x] Commandes par-dessus l'image, masquées après 5 s (Android)

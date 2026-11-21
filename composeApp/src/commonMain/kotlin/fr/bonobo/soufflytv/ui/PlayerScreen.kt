@@ -306,12 +306,12 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
         if (live) return@LaunchedEffect
         while (true) {
             delay(10_000)
-            if (controller.durationMs > 0) state.library.setPosition(resumeKey, resumePosition(controller))
+            if (controller.durationMs > 0) state.library.saveProgress(resumeKey, controller.positionMs, controller.durationMs)
         }
     }
     DisposableEffect(controller) {
         onDispose {
-            if (!live && controller.durationMs > 0) state.library.setPosition(resumeKey, resumePosition(controller))
+            if (!live && controller.durationMs > 0) state.library.saveProgress(resumeKey, controller.positionMs, controller.durationMs)
         }
     }
 
@@ -648,13 +648,6 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
             }
         }
     }
-}
-
-/** Fin de film : on oublie la position ; sinon on garde où on en était. */
-private fun resumePosition(controller: PlayerController): Long {
-    val pos = controller.positionMs
-    val duration = controller.durationMs
-    return if (duration > 0 && pos > duration - 60_000) 0 else pos
 }
 
 @Composable

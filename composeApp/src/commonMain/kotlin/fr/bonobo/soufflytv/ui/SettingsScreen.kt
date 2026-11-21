@@ -159,7 +159,7 @@ fun SettingsScreen(state: AppState) {
                 Spacer(Modifier.height(24.dp))
                 SectionLabel("À PROPOS", Modifier.padding(start = 14.dp, bottom = 6.dp))
                 Text(
-                    "SoufflyTV 0.6 (${if (isTvBuild) "version TV" else if (isAndroid) "version smartphone" else "version ordinateur"}) — lecteur IPTV libre sous licence GPL v3.\n" +
+                    "SoufflyTV 0.7 (${if (isTvBuild) "version TV" else if (isAndroid) "version smartphone" else "version ordinateur"}) — lecteur IPTV libre sous licence GPL v3.\n" +
                         "Aucune chaîne ni liste n'est fournie : l'application lit uniquement les sources que tu ajoutes.\n" +
                         "Lecture : Media3 (Android), libVLC (ordinateur).",
                     color = Cm.TextMuted,

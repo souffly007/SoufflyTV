@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,6 +49,7 @@ import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.MovieInfo
 import fr.bonobo.soufflytv.model.Source
 import fr.bonobo.soufflytv.platform.isTvBuild
+import fr.bonobo.soufflytv.platform.rememberUrlOpener
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
 import kotlinx.coroutines.CancellationException
@@ -66,7 +68,11 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
     val favorite = state.library.isFavorite(source.id, movie.id)
     val resumeKey = "${source.id}|${movie.id}"
     val saved = state.library.position(resumeKey)?.takeIf { it > 30_000 }
+    val progress = state.library.progress(resumeKey)
+    val watched = state.library.isWatched(resumeKey)
 
+    val openUrl = rememberUrlOpener()
+    var trailerError by remember { mutableStateOf(false) }
     val playFocus = remember { FocusRequester() }
     var playFocused by remember { mutableStateOf(false) }
     KeepFocus(playFocus, movie.id, isFocused = { playFocused })
@@ -152,6 +158,23 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
                         info.cast?.let { Credit("Avec", it) }
 
                         Spacer(Modifier.height(20.dp))
+                        // Film commencé : barre de progression au-dessus des boutons
+                        if (saved != null && progress != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LinearProgressIndicator(
+                                    progress = { progress },
+                                    modifier = Modifier.width(220.dp).height(4.dp),
+                                    color = Cm.Cyan,
+                                    trackColor = Cm.SurfaceHigher,
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text("Arrêté à ${formatDuration(saved)}", color = Cm.TextMuted, fontSize = 13.sp)
+                            }
+                            Spacer(Modifier.height(10.dp))
+                        } else if (watched) {
+                            Text("✓ Déjà vu", color = Cm.Success, fontSize = 13.sp)
+                            Spacer(Modifier.height(10.dp))
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Button(
                                 onClick = { play(fromStart = false) },
@@ -163,13 +186,26 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
                                 Icon(AppIcons.Play, contentDescription = null, modifier = Modifier.size(20.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    if (saved != null) "Reprendre à ${formatDuration(saved)}" else "Lecture",
+                                    if (saved != null) "Continuer (${formatDuration(saved)})" else "Lire",
                                     fontWeight = FontWeight.Bold,
                                 )
                             }
                             if (saved != null) {
-                                OutlinedButton(onClick = { play(fromStart = true) }) { Text("Depuis le début") }
+                                OutlinedButton(onClick = { play(fromStart = true) }) { Text("↺ Reprendre du début") }
                             }
+                        }
+                        // Bande-annonce sur sa propre ligne : la place manque à côté des autres boutons sur téléphone
+                        info.trailer?.let { trailer ->
+                            Spacer(Modifier.height(10.dp))
+                            OutlinedButton(onClick = { trailerError = !openUrl(trailer) }) { Text("▶ Bande-annonce") }
+                        }
+                        if (trailerError) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Impossible d'ouvrir la bande-annonce : aucune application YouTube ni navigateur sur cet appareil",
+                                color = Cm.Error,
+                                fontSize = 13.sp,
+                            )
                         }
                         Spacer(Modifier.height(24.dp))
                     }

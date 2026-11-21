@@ -27,6 +27,7 @@ import fr.bonobo.soufflytv.data.civilFromDays
 import fr.bonobo.soufflytv.data.movieMetaLine
 import fr.bonobo.soufflytv.data.parseRuntimeMinutes
 import fr.bonobo.soufflytv.data.ratingValue
+import fr.bonobo.soufflytv.data.trailerUrl
 import fr.bonobo.soufflytv.data.runtimeLabel
 import fr.bonobo.soufflytv.player.TrackOption
 import fr.bonobo.soufflytv.player.isAudioDescription
@@ -227,5 +228,9 @@ class ParsersTest {
         assertEquals("6,9", ratingValue("6.9"))
         assertEquals("10,0", ratingValue("10"))
         assertEquals(null, ratingValue("N/A"))
+        assertEquals("https://www.youtube.com/watch?v=dQw4w9WgXcQ", trailerUrl("dQw4w9WgXcQ"))
+        assertEquals("https://youtu.be/abc", trailerUrl(" https://youtu.be/abc "))
+        assertEquals(null, trailerUrl(""))
+        assertEquals(null, trailerUrl("pas une vidéo"))
     }
 }

@@ -159,6 +159,7 @@ class XtreamProvider(
                             type = ItemType.MOVIE,
                             plot = o.s("plot"),
                             rating = o.s("rating"),
+                            added = o.s("added")?.toLongOrNull()?.takeIf { it > 0 }?.times(1000),
                         )
                     }
                     Section.SERIES -> {
@@ -173,6 +174,7 @@ class XtreamProvider(
                             type = ItemType.SERIES,
                             plot = o.s("plot"),
                             rating = o.s("rating"),
+                            added = o.s("last_modified")?.toLongOrNull()?.takeIf { it > 0 }?.times(1000),
                         )
                     }
                 }
@@ -225,6 +227,7 @@ class XtreamProvider(
             ),
             director = info.s("director")?.takeIf { it.isNotBlank() },
             cast = (info.s("cast") ?: info.s("actors"))?.takeIf { it.isNotBlank() },
+            trailer = trailerUrl(info.s("youtube_trailer") ?: info.s("trailer")),
         )
         movieCache[movie.id] = result
         return result
@@ -248,6 +251,7 @@ class XtreamProvider(
             meta = listOfNotNull(info.meta, if (seasons > 1) "$seasons saisons" else "1 saison").joinToString(" · "),
             director = info.director,
             cast = info.cast,
+            trailer = info.trailer,
         )
     }
 
@@ -299,6 +303,7 @@ class XtreamProvider(
             backdrop = backdrop,
             director = info?.s("director")?.takeIf { it.isNotBlank() },
             cast = (info?.s("cast") ?: info?.s("actors"))?.takeIf { it.isNotBlank() },
+            trailer = trailerUrl(info?.s("youtube_trailer") ?: info?.s("trailer")),
         )
         seriesCache[series.stream] = result
         return result
