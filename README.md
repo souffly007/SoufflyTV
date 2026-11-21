@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.8.0 && git push origin v0.8.0
+git tag v0.8.1 && git push origin v0.8.1
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).

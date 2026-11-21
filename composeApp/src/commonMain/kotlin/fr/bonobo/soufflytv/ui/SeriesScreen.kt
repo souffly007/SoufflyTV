@@ -50,6 +50,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import fr.bonobo.soufflytv.platform.rememberUrlOpener
 import fr.bonobo.soufflytv.AppState
 import fr.bonobo.soufflytv.data.toUserMessage
@@ -91,6 +93,8 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
     // Grand écran : infos et boutons à gauche, saisons et épisodes à droite (style des maquettes)
     val wide = maxWidth >= 840.dp
+    val leftScroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize()) {
         TopBar(
             title = series.name,
@@ -155,7 +159,11 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                         stacked = stacked,
                         favorite = favorite,
                         onToggleFavorite = { state.library.toggleFavorite(source.id, series) },
-                        focusModifier = Modifier.focusRequester(resumeFocus).onFocusChanged { resumeFocused = it.isFocused },
+                        focusModifier = Modifier.focusRequester(resumeFocus).onFocusChanged {
+                            resumeFocused = it.isFocused
+                            // retour sur le bouton principal : la colonne remonte tout en haut (affiche visible)
+                            if (it.isFocused && wide) scope.launch { leftScroll.animateScrollTo(0) }
+                        },
                         onPlay = { target, fromStart -> playEpisode(target, fromStart) },
                     )
                 }
@@ -203,14 +211,19 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                             Modifier
                                 .width(380.dp)
                                 .fillMaxHeight()
-                                .verticalScroll(rememberScrollState())
+                                .verticalScroll(leftScroll)
                                 .padding(start = 24.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
                         ) {
-                            DetailPoster(current.cover, 150.dp, AppIcons.Library)
-                            Spacer(Modifier.height(14.dp))
-                            Text(current.name, color = Cm.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 27.sp)
-                            Spacer(Modifier.height(8.dp))
-                            MetaChips(current.meta)
+                            // Affiche et titre côte à côte : moins de hauteur, moins de défilement
+                            Row {
+                                DetailPoster(current.cover, 110.dp, AppIcons.Library)
+                                Spacer(Modifier.width(14.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(current.name, color = Cm.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
+                                    Spacer(Modifier.height(8.dp))
+                                    MetaChips(current.meta)
+                                }
+                            }
                             current.plot?.let {
                                 Spacer(Modifier.height(10.dp))
                                 Text(it, color = Cm.Text.copy(alpha = 0.85f), fontSize = 13.sp, lineHeight = 19.sp, maxLines = 6, overflow = TextOverflow.Ellipsis)

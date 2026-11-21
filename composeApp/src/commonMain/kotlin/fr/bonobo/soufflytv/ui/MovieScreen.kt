@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import fr.bonobo.soufflytv.AppState
 import fr.bonobo.soufflytv.data.formatDuration
 import fr.bonobo.soufflytv.model.Channel
@@ -95,6 +97,8 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
     }
 
     val canPlayTrailer = info.trailer != null
+    val pageScroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
     Box(Modifier.fillMaxSize().background(Cm.Background)) {
         DetailBackdrop(info.backdrop ?: info.cover)
 
@@ -155,7 +159,11 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
                             DetailPrimaryButton(
                                 if (saved != null) "Continuer la lecture (${formatDuration(saved)})" else "Lire",
                                 AppIcons.Play,
-                                buttonsWidth.focusRequester(playFocus).onFocusChanged { playFocused = it.isFocused },
+                                buttonsWidth.focusRequester(playFocus).onFocusChanged {
+                                    playFocused = it.isFocused
+                                    // retour sur « Lire » : la fiche remonte tout en haut
+                                    if (it.isFocused) scope.launch { pageScroll.animateScrollTo(0) }
+                                },
                             ) { play(fromStart = false) }
                             if (saved != null) {
                                 DetailButton("↺  Reprendre du début", buttonsWidth) { play(fromStart = true) }
@@ -187,7 +195,7 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
                     Row(
                         Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
+                                .verticalScroll(pageScroll)
                             .padding(horizontal = 32.dp, vertical = 16.dp),
                     ) {
                         DetailPoster(info.cover, 200.dp, AppIcons.Movie)
@@ -202,7 +210,7 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
                     Column(
                         Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(pageScroll)
                             .padding(16.dp),
                     ) {
                         Row {
