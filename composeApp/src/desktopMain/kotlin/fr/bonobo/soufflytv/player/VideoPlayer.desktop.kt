@@ -54,23 +54,44 @@ private val bundledVlcDir: File? by lazy {
     candidates.firstOrNull { File(it, lib).exists() }
 }
 
+/** Raison de l'échec du chargement de libVLC, affichée dans le message d'erreur. */
+@Volatile
+private var vlcProblem: String? = null
+
 /**
  * Une seule instance libVLC pour toute la durée de l'application :
  * le chargement des modules ne se refait pas à chaque changement de chaîne.
  */
 private val vlcFactory: MediaPlayerFactory? by lazy {
-    try {
-        val bundled = bundledVlcDir
-        val discovery = if (bundled != null) {
-            NativeLibrary.addSearchPath(RuntimeUtil.getLibVlcCoreLibraryName(), bundled.absolutePath)
-            NativeLibrary.addSearchPath(RuntimeUtil.getLibVlcLibraryName(), bundled.absolutePath)
+    bundledVlcDir?.let { dir ->
+        try {
+            val path = dir.absolutePath
+            NativeLibrary.addSearchPath(RuntimeUtil.getLibVlcCoreLibraryName(), path)
+            NativeLibrary.addSearchPath(RuntimeUtil.getLibVlcLibraryName(), path)
+            // Windows : libvlccore d'abord, puis libvlc, depuis le dossier livré avec l'application
+            // (libvlc.dll ne trouve pas toujours sa dépendance toute seule)
+            NativeLibrary.getInstance(RuntimeUtil.getLibVlcCoreLibraryName())
+            NativeLibrary.getInstance(RuntimeUtil.getLibVlcLibraryName())
             // pas de recherche du VLC du système : il ne doit pas se mélanger avec celui livré
-            NativeDiscovery(*arrayOf<NativeDiscoveryStrategy>())
-        } else {
-            NativeDiscovery().takeIf { it.discover() } ?: return@lazy null
+            return@lazy MediaPlayerFactory(NativeDiscovery(*arrayOf<NativeDiscoveryStrategy>()), "--no-video-title-show")
+        } catch (e: Throwable) {
+            vlcProblem = "libVLC livrée dans $dir : ${e.message ?: e::class.simpleName}"
         }
-        MediaPlayerFactory(discovery, "--no-video-title-show")
+    }
+    // Sinon : VLC installé sur le système
+    try {
+        val discovery = NativeDiscovery()
+        if (discovery.discover()) {
+            MediaPlayerFactory(discovery, "--no-video-title-show")
+        } else {
+            if (vlcProblem == null) {
+                val resources = System.getProperty("compose.application.resources.dir")
+                vlcProblem = if (resources != null) "pas de libVLC dans $resources${File.separator}vlc" else null
+            }
+            null
+        }
     } catch (e: Throwable) {
+        if (vlcProblem == null) vlcProblem = e.message ?: e::class.simpleName
         null
     }
 }
@@ -109,7 +130,10 @@ actual fun VideoPlayer(
     val vlc = remember { createVlc() }
 
     if (vlc == null) {
-        LaunchedEffect(Unit) { currentOnStatus(PlayerStatus.Error(VLC_MISSING)) }
+        LaunchedEffect(Unit) {
+            val detail = vlcProblem?.let { "\n($it)" } ?: ""
+            currentOnStatus(PlayerStatus.Error(VLC_MISSING + detail))
+        }
         Box(modifier.background(Color.Black))
         return
     }

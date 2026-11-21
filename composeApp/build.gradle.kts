@@ -2,6 +2,10 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
+// Version de SoufflyTV, la même pour Android et pour les installeurs PC (à changer ici seulement)
+val appVersion = "0.6.3"
+val appVersionCode = 18
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidApplication)
@@ -81,8 +85,8 @@ android {
         applicationId = "fr.bonobo.soufflytv"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 17
-        versionName = "0.6.2"
+        versionCode = appVersionCode
+        versionName = appVersion
     }
     buildFeatures {
         buildConfig = true
@@ -179,7 +183,8 @@ compose.desktop {
             includeAllModules = true
             packageName = "SoufflyTV"
             // jpackage refuse un numéro majeur à 0 sur certaines plateformes
-            packageVersion = "1.0.0"
+            // Windows ne remplace une installation que si le numéro augmente
+            packageVersion = appVersion
             description = "Lecteur IPTV libre (M3U, Xtream Codes, portail Stalker)"
             vendor = "Bonobo"
             licenseFile.set(rootProject.file("LICENSE"))

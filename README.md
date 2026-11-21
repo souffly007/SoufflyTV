@@ -114,11 +114,14 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.6.2 && git push origin v0.6.2
+git tag v0.6.3 && git push origin v0.6.3
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
 Le workflow peut aussi être lancé à la main (onglet Actions → Release → Run workflow).
+
+Mise à jour : lancer le nouvel installeur. Si une ancienne version « 1.0.0 » est installée, la désinstaller d'abord
+(Paramètres → Applications) : les comptes et réglages, rangés dans `%APPDATA%\SoufflyTV`, sont conservés.
 
 **Sur un PC Windows** (JDK 21 : `winget install EclipseAdoptium.Temurin.21.JDK`, et Android Studio
 ou le SDK Android, car le projet contient aussi l'app Android) :
