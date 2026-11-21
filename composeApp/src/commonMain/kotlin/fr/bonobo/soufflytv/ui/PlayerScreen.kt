@@ -77,8 +77,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import fr.bonobo.soufflytv.AppState
 import fr.bonobo.soufflytv.Screen
 import fr.bonobo.soufflytv.data.formatDuration
@@ -608,8 +606,7 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
         }
     } else {
         // Ordinateur : la vidéo libVLC est une fenêtre native, rien de Compose ne se dessine par-dessus.
-        // Fenêtre normale : barres autour de la vidéo. Plein écran : la vidéo seule,
-        // les barres apparaissent par-dessus (fenêtres « popup ») quand la souris bouge ou qu'une touche est pressée.
+        // Fenêtre normale : barres autour de la vidéo. Plein écran : la vidéo seule.
         val cinema = state.isFullscreen
         var cinemaControls by remember { mutableStateOf(true) }
         LaunchedEffect(interaction) { cinemaControls = true }
@@ -633,37 +630,20 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
             onDispose { if (state.isFullscreen) state.setFullscreen?.invoke(false) }
         }
 
-        if (!cinema) {
-            Row(Modifier.fillMaxSize().background(Color.Black).then(keyModifier)) {
-                if (panelOpen) panel(Modifier.fillMaxHeight())
-                Column(Modifier.weight(1f).fillMaxHeight()) {
+        // Une seule mise en page : la vidéo garde sa place (sinon libVLC serait recréée et le flux relancé).
+        // Plein écran : les barres se replient, la vidéo prend tout l'écran ; elles reviennent
+        // quand la souris bouge ou qu'une touche est pressée (pas de fenêtre par-dessus la vidéo :
+        // certains bureaux, KDE notamment, quittent alors le plein écran).
+        val showBars = !cinema || cinemaControls || panelOpen
+        Row(Modifier.fillMaxSize().background(Color.Black).then(keyModifier)) {
+            if (panelOpen) panel(Modifier.fillMaxHeight())
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                if (showBars) {
                     topBar(Modifier.fillMaxWidth().background(Cm.Surface))
                     CyanLine()
-                    video(Modifier.weight(1f).fillMaxWidth())
-                    bottomBar(Modifier.fillMaxWidth().background(Cm.Surface))
                 }
-            }
-        } else {
-            Box(Modifier.fillMaxSize().background(Color.Black).then(keyModifier)) {
-                video(Modifier.fillMaxSize())
-            }
-            if (cinemaControls && !panelOpen) {
-                Popup(alignment = Alignment.TopCenter, properties = PopupProperties(focusable = false)) {
-                    topBar(Modifier.fillMaxWidth().background(Cm.Surface.copy(alpha = 0.94f)))
-                }
-                Popup(alignment = Alignment.BottomCenter, properties = PopupProperties(focusable = false)) {
-                    bottomBar(Modifier.fillMaxWidth().background(Cm.Surface.copy(alpha = 0.94f)))
-                }
-            }
-            if (panelOpen) {
-                // Liste des chaînes par-dessus la vidéo, à gauche ; elle prend le clavier
-                Popup(
-                    alignment = Alignment.CenterStart,
-                    onDismissRequest = { closePanel() },
-                    properties = PopupProperties(focusable = true),
-                ) {
-                    panel(Modifier.fillMaxHeight())
-                }
+                video(Modifier.weight(1f).fillMaxWidth())
+                if (showBars) bottomBar(Modifier.fillMaxWidth().background(Cm.Surface))
             }
         }
     }

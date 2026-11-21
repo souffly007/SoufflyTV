@@ -1,5 +1,5 @@
 # Publication d'une version : pousser une étiquette, par exemple
-#   git tag v0.6.4 && git push origin v0.6.4
+#   git tag v0.6.5 && git push origin v0.6.5
 # → installeurs Windows (.msi, .exe, libVLC comprise) + APK Android TV et smartphone,
 #   joints à une « Release » GitHub.
 #
