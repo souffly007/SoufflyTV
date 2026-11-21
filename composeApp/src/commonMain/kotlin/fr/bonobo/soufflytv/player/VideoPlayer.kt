@@ -141,7 +141,8 @@ class PlayerController {
         impl?.selectAudio(id)
     }
 
-    fun setSpeed(value: Float) {
+    /** (Pas « setSpeed » : même nom Java que le setter de la propriété [speed].) */
+    fun changeSpeed(value: Float) {
         speed = value
         impl?.setSpeed(value)
     }

@@ -762,7 +762,7 @@ private fun PlayerTopBar(
                 },
                 options = PLAYBACK_SPEEDS.map { TrackOption(it.toString(), speedLabel(it), selected = controller.speed == it) },
                 allowOff = false,
-                onSelect = { id -> id?.toFloatOrNull()?.let(controller::setSpeed) },
+                onSelect = { id -> id?.toFloatOrNull()?.let(controller::changeSpeed) },
                 onOpen = onInteract,
             )
         }
