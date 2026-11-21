@@ -93,9 +93,18 @@ class BrowserModel(
     /** ▶ depuis la barre latérale : entre dans le contenu (catégories ou accueil). */
     var enterContent: (() -> Boolean)? = null
 
+    /**
+     * Augmente à chaque choix dans la barre latérale : l'accueil ou la colonne des catégories
+     * reprend alors le focus (sinon il restait sur la barre, ouverte par-dessus le contenu).
+     */
+    var contentFocusToken by mutableIntStateOf(0)
+        private set
+
     fun goHome() {
         showHome = true
         homeReturnKey = null
+        returnFocusId = null
+        contentFocusToken++
     }
 
     /** Rangées de l'accueil : films et séries récents (date d'ajout du fournisseur), films les mieux notés. */
@@ -206,6 +215,9 @@ class BrowserModel(
 
     fun selectSection(target: Section) {
         showHome = false
+        // Rubrique choisie dans la barre : le focus va sur sa catégorie, pas sur une affiche ouverte avant
+        returnFocusId = null
+        contentFocusToken++
         if (target == section) return
         section = target
         providerCategories = emptyList()

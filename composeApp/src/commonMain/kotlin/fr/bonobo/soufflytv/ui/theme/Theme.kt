@@ -1,5 +1,8 @@
 package fr.bonobo.soufflytv.ui.theme
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.material.ripple.RippleAlpha
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
@@ -14,6 +17,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
 
 /** Palette façon CyanogenMod : noir profond, cyan électrique, texte clair. */
 object Cm {
@@ -67,15 +71,34 @@ private val CyanogenScheme = darkColorScheme(
     onError = Color.Black,
 )
 
+/**
+ * Défilement minimal quand un élément prend le focus : on ne bouge que s'il sort de l'écran.
+ * (Sur Android TV, Compose place par défaut l'élément au tiers de la hauteur : l'en-tête des séries
+ * et le bandeau « À la une » se retrouvaient coupés.)
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private val MinimalBringIntoView = object : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        val trailingEdge = offset + size
+        return when {
+            offset >= 0f && trailingEdge <= containerSize -> 0f // déjà visible
+            offset < 0f && trailingEdge > containerSize -> 0f // plus grand que la zone : on ne bouge pas
+            abs(offset) < abs(trailingEdge - containerSize) -> offset
+            else -> trailingEdge - containerSize
+        }
+    }
+}
+
 /** Couleur du « curseur » de la télécommande (réglable). */
 val LocalFocusColor = staticCompositionLocalOf { Color(0xFFFFD600) }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SoufflyTheme(focusColor: Color = Color(0xFFFFD600), content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = CyanogenScheme) {
         CompositionLocalProvider(
             LocalFocusColor provides focusColor,
+            LocalBringIntoViewSpec provides MinimalBringIntoView,
             // Boutons Material (Lecture, icônes du lecteur…) : fond bien visible quand ils ont le focus
             LocalRippleConfiguration provides RippleConfiguration(
                 color = focusColor,

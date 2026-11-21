@@ -297,7 +297,7 @@ private fun CategoryPane(model: BrowserModel, modifier: Modifier) {
 
     // Télécommande : à l'ouverture et au retour du lecteur, le focus va sur la catégorie choisie
     KeepFocus(
-        selectedFocus, selectedId, model.loadedOnce,
+        selectedFocus, selectedId, model.loadedOnce, model.contentFocusToken,
         isFocused = { selectedFocused || selectedId == null || model.returnFocusId != null },
         prepare = {
             val item = model.categories.indexOfFirst { it.id == selectedId } + 1 // ligne 0 : en-tête

@@ -118,7 +118,7 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                     state.focusMemory[seasonKey] = target.seasonIndex.toString()
                     state.focusMemory[episodeKey] = target.episode.id
                     if (fromStart) state.library.setPosition("${source.id}|${target.episode.id}", 0)
-                    state.play(source, targetSeason.episodes, target.episodeIndex)
+                    state.play(source, withCover(targetSeason.episodes, current.cover), target.episodeIndex)
                 }
 
                 // Première arrivée sur la série : le focus va sur « Reprendre » ;
@@ -126,7 +126,7 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                 val resumeFocus = remember { FocusRequester() }
                 var resumeFocused by remember { mutableStateOf(false) }
                 if (rememberedId == null) {
-                    KeepFocus(resumeFocus, series.id, isFocused = { resumeFocused })
+                    KeepFocus(resumeFocus, series.id, isFocused = { resumeFocused }, prepare = { listState.scrollToItem(0) })
                 } else {
                     KeepFocus(
                         episodeFocus, series.id, seasonIndex,
@@ -179,7 +179,7 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                         ) {
                             state.focusMemory[seasonKey] = seasonIndex.toString()
                             state.focusMemory[episodeKey] = episode.id
-                            state.play(source, season.episodes, i)
+                            state.play(source, withCover(season.episodes, current.cover), i)
                         }
                     }
                 }
@@ -368,3 +368,7 @@ private fun ResumeButtons(
         }
     }
 }
+
+/** Épisodes sans vignette : l'affiche de la série (pour « Continuer à regarder » sur l'accueil). */
+private fun withCover(episodes: List<Channel>, cover: String?): List<Channel> =
+    if (cover == null) episodes else episodes.map { if (it.logo == null) it.copy(logo = cover) else it }

@@ -91,7 +91,7 @@ fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Mod
     var cardFocused by remember { mutableStateOf(false) }
     val returnKey = model.homeReturnKey
     if (returnKey == null) {
-        KeepFocus(heroFocus, featured?.id, isFocused = { heroFocused || featured == null })
+        KeepFocus(heroFocus, featured?.id, model.contentFocusToken, isFocused = { heroFocused || featured == null })
     } else {
         KeepFocus(cardFocus, returnKey, isFocused = { cardFocused })
     }
