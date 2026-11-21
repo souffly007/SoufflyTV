@@ -46,6 +46,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxHeight
 import fr.bonobo.soufflytv.data.formatDuration
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import coil3.compose.AsyncImage
 import fr.bonobo.soufflytv.platform.rememberUrlOpener
 import fr.bonobo.soufflytv.AppState
@@ -83,6 +86,11 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
         }
     }
 
+    Box(Modifier.fillMaxSize().background(Cm.Background)) {
+        info?.let { DetailBackdrop(it.backdrop ?: it.cover) }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // Grand écran : infos et boutons à gauche, saisons et épisodes à droite (style des maquettes)
+    val wide = maxWidth >= 840.dp
     Column(Modifier.fillMaxSize()) {
         TopBar(
             title = series.name,
@@ -108,7 +116,12 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                 val season = current.seasons[seasonIndex.coerceIn(0, current.seasons.lastIndex)]
                 val rememberedId = state.focusMemory[episodeKey]
                 val targetIndex = season.episodes.indexOfFirst { it.id == rememberedId }.coerceAtLeast(0)
-                val firstEpisodeItem = if (current.seasons.size > 1) 3 else 2 // en-tête, saisons, titre
+                // index de la première ligne d'épisode dans la liste
+                val firstEpisodeItem = when {
+                    wide -> 0
+                    current.seasons.size > 1 -> 3 // en-tête, saisons, titre
+                    else -> 2
+                }
 
                 // Où en est-on dans la série : épisode commencé, ou suivant du dernier vu
                 val resume = resumeTarget(current, source.id, state)
@@ -126,7 +139,7 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                 val resumeFocus = remember { FocusRequester() }
                 var resumeFocused by remember { mutableStateOf(false) }
                 if (rememberedId == null) {
-                    KeepFocus(resumeFocus, series.id, isFocused = { resumeFocused }, prepare = { listState.scrollToItem(0) })
+                    KeepFocus(resumeFocus, series.id, isFocused = { resumeFocused }, prepare = { if (!wide) listState.scrollToItem(0) })
                 } else {
                     KeepFocus(
                         episodeFocus, series.id, seasonIndex,
@@ -135,56 +148,100 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                     )
                 }
 
-                LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
-                    item {
-                        SeriesHeader(current)
-                        ResumeButtons(
-                            current,
-                            resume,
-                            focusModifier = Modifier.focusRequester(resumeFocus).onFocusChanged { resumeFocused = it.isFocused },
-                            onPlay = { target, fromStart -> playEpisode(target, fromStart) },
-                        )
-                    }
+                val resumeButtons: @Composable (Boolean) -> Unit = { stacked ->
+                    ResumeButtons(
+                        current,
+                        resume,
+                        stacked = stacked,
+                        favorite = favorite,
+                        onToggleFavorite = { state.library.toggleFavorite(source.id, series) },
+                        focusModifier = Modifier.focusRequester(resumeFocus).onFocusChanged { resumeFocused = it.isFocused },
+                        onPlay = { target, fromStart -> playEpisode(target, fromStart) },
+                    )
+                }
+                val seasonTabs: @Composable () -> Unit = {
                     if (current.seasons.size > 1) {
-                        item {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                itemsIndexed(current.seasons) { i, s ->
-                                    Pill("Saison ${s.number}", selected = i == seasonIndex) {
-                                        seasonIndex = i
-                                        state.focusMemory[seasonKey] = i.toString()
-                                    }
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            itemsIndexed(current.seasons) { i, s ->
+                                Pill("Saison ${s.number}", selected = i == seasonIndex) {
+                                    seasonIndex = i
+                                    state.focusMemory[seasonKey] = i.toString()
                                 }
                             }
                         }
                     }
-                    item {
-                        SectionLabel(
-                            "SAISON ${season.number} · ${season.episodes.size} ÉPISODE(S)",
-                            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
+                }
+                val seasonTitle: @Composable () -> Unit = {
+                    SectionLabel(
+                        "SAISON ${season.number} · ${season.episodes.size} ÉPISODE(S)",
+                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                val episodeRow: @Composable (Int, Channel) -> Unit = { i, episode ->
+                    val key = "${source.id}|${episode.id}"
+                    EpisodeRow(
+                        episode,
+                        i,
+                        progress = state.library.position(key)?.takeIf { it > 30_000 }?.let { state.library.progress(key) },
+                        watched = state.library.isWatched(key),
+                        focusModifier = if (i == targetIndex) {
+                            Modifier.focusRequester(episodeFocus).onFocusChanged { episodeFocused = it.isFocused }
+                        } else Modifier,
+                    ) {
+                        state.focusMemory[seasonKey] = seasonIndex.toString()
+                        state.focusMemory[episodeKey] = episode.id
+                        state.play(source, withCover(season.episodes, current.cover), i)
                     }
-                    itemsIndexed(season.episodes) { i, episode ->
-                        val key = "${source.id}|${episode.id}"
-                        EpisodeRow(
-                            episode,
-                            i,
-                            progress = state.library.position(key)?.takeIf { it > 30_000 }?.let { state.library.progress(key) },
-                            watched = state.library.isWatched(key),
-                            focusModifier = if (i == targetIndex) {
-                                Modifier.focusRequester(episodeFocus).onFocusChanged { episodeFocused = it.isFocused }
-                            } else Modifier,
+                }
+
+                if (wide) {
+                    Row(Modifier.fillMaxSize()) {
+                        Column(
+                            Modifier
+                                .width(380.dp)
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState())
+                                .padding(start = 24.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
                         ) {
-                            state.focusMemory[seasonKey] = seasonIndex.toString()
-                            state.focusMemory[episodeKey] = episode.id
-                            state.play(source, withCover(season.episodes, current.cover), i)
+                            DetailPoster(current.cover, 150.dp, AppIcons.Library)
+                            Spacer(Modifier.height(14.dp))
+                            Text(current.name, color = Cm.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 27.sp)
+                            Spacer(Modifier.height(8.dp))
+                            MetaChips(current.meta)
+                            current.plot?.let {
+                                Spacer(Modifier.height(10.dp))
+                                Text(it, color = Cm.Text.copy(alpha = 0.85f), fontSize = 13.sp, lineHeight = 19.sp, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                            }
+                            Spacer(Modifier.height(14.dp))
+                            resumeButtons(true)
                         }
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(Cm.Outline))
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            seasonTabs()
+                            seasonTitle()
+                            LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
+                                itemsIndexed(season.episodes) { i, episode -> episodeRow(i, episode) }
+                            }
+                        }
+                    }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
+                        item {
+                            SeriesHeader(current)
+                            resumeButtons(false)
+                        }
+                        if (current.seasons.size > 1) item { seasonTabs() }
+                        item { seasonTitle() }
+                        itemsIndexed(season.episodes) { i, episode -> episodeRow(i, episode) }
                     }
                 }
             }
         }
+    }
+    }
     }
 }
 
@@ -312,6 +369,9 @@ private fun ResumeTarget.label(): String = "S${seasonNumber} · Épisode ${episo
 private fun ResumeButtons(
     info: SeriesInfo,
     resume: ResumeTarget?,
+    stacked: Boolean,
+    favorite: Boolean,
+    onToggleFavorite: () -> Unit,
     focusModifier: Modifier,
     onPlay: (ResumeTarget, Boolean) -> Unit,
 ) {
@@ -322,6 +382,50 @@ private fun ResumeButtons(
     val resumePosition = resume?.positionMs
     val openUrl = rememberUrlOpener()
     var trailerError by remember { mutableStateOf(false) }
+    val mainLabel = when {
+        resumePosition != null -> "Reprendre l'épisode (${formatDuration(resumePosition)})"
+        resume != null -> "Épisode suivant"
+        else -> "Lire ${target.label()}"
+    }
+    if (stacked) {
+        // Grand écran : boutons empilés, comme sur la fiche film
+        val width = Modifier.fillMaxWidth()
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (resume != null) {
+                Text(
+                    if (resumePosition != null) "EN COURS · ${resume.label()}" else "À SUIVRE · ${resume.label()}",
+                    style = MonoLabel,
+                    color = Cm.Cyan,
+                )
+                Text(resume.episode.name, color = Cm.Text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            DetailPrimaryButton(mainLabel, AppIcons.Play, width.then(focusModifier)) { onPlay(target, false) }
+            if (resume != null && resumePosition != null) {
+                DetailButton("↺  Reprendre l'épisode du début", width) { onPlay(resume, true) }
+            }
+            if (resume != null && first != null) {
+                DetailButton("Voir la série depuis le début", width) { onPlay(first, true) }
+            }
+            DetailButton(
+                if (favorite) "Dans ma liste" else "Ajouter à ma liste",
+                width,
+                icon = if (favorite) AppIcons.Star else AppIcons.StarBorder,
+                tint = if (favorite) Cm.Cyan else Cm.Text,
+                onClick = onToggleFavorite,
+            )
+            info.trailer?.let { trailer ->
+                DetailButton("Bande-annonce", width, icon = AppIcons.Play) { trailerError = !openUrl(trailer) }
+            }
+            if (trailerError) {
+                Text(
+                    "Impossible d'ouvrir la bande-annonce : aucune application YouTube ni navigateur sur cet appareil",
+                    color = Cm.Error,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+        return
+    }
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
         if (resume != null) {
             Text(

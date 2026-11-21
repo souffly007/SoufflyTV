@@ -193,6 +193,10 @@ actual fun VideoPlayer(
             override fun selectText(id: String?) {
                 vlc.player.subpictures().setTrack(id?.toIntOrNull() ?: -1)
             }
+
+            override fun setSpeed(speed: Float) {
+                vlc.player.controls().setRate(speed)
+            }
         })
 
         onDispose {

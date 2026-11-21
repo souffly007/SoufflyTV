@@ -84,7 +84,16 @@ interface PlayerImpl {
     fun selectAudio(id: String)
     /** null = sous-titres désactivés. */
     fun selectText(id: String?)
+    /** Vitesse de lecture (1 = normale). */
+    fun setSpeed(speed: Float)
 }
+
+/** Vitesses proposées dans le lecteur (films et séries). */
+val PLAYBACK_SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
+
+/** 1.25 → « ×1,25 », 1 → « Normale ». */
+fun speedLabel(speed: Float): String =
+    if (speed == 1f) "Normale" else "×" + speed.toString().removeSuffix(".0").replace('.', ',')
 
 /** Pont entre l'interface commune et le lecteur natif (Media3 ou libVLC). */
 class PlayerController {
@@ -94,6 +103,9 @@ class PlayerController {
     var audioTracks by mutableStateOf<List<TrackOption>>(emptyList())
     var textTracks by mutableStateOf<List<TrackOption>>(emptyList())
     var aspect by mutableStateOf(AspectMode.FIT)
+    /** Vitesse de lecture en cours (films et séries). */
+    var speed by mutableStateOf(1f)
+        private set
 
     /** Ordinateur : la souris bouge ou clique sur la vidéo (fenêtre native, hors de Compose). */
     var onSurfaceActivity: (() -> Unit)? = null
@@ -127,6 +139,11 @@ class PlayerController {
 
     fun selectAudio(id: String) {
         impl?.selectAudio(id)
+    }
+
+    fun setSpeed(value: Float) {
+        speed = value
+        impl?.setSpeed(value)
     }
 
     fun selectText(id: String?) {

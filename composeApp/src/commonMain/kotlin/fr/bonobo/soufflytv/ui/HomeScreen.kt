@@ -3,6 +3,7 @@ package fr.bonobo.soufflytv.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -219,7 +221,7 @@ private fun FeaturedBanner(
             )
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(0.6f to Color.Transparent, 1f to Cm.Background)))
         }
-        Column(Modifier.fillMaxHeight().fillMaxWidth(0.6f).padding(start = 28.dp, top = 20.dp, end = 8.dp)) {
+        Column(Modifier.fillMaxHeight().fillMaxWidth(0.68f).padding(start = 28.dp, top = 20.dp, end = 8.dp)) {
             Text(
                 if (saved != null) "REPRENDRE" else "À LA UNE",
                 style = MonoLabel,
@@ -252,23 +254,29 @@ private fun FeaturedBanner(
                             else -> "Lire"
                         },
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                 }
                 if (saved != null && !series) {
-                    OutlinedButton(onClick = { onPlay(true) }) { Text("↺ Du début") }
+                    OutlinedButton(onClick = { onPlay(true) }) { Text("↺ Du début", maxLines = 1, softWrap = false) }
                 }
                 if (!series) {
-                    OutlinedButton(onClick = onOpen) { Text("Plus d'infos") }
+                    OutlinedButton(onClick = onOpen) { Text("Plus d'infos", maxLines = 1, softWrap = false) }
                 }
-                OutlinedButton(onClick = { state.library.toggleFavorite(source.id, item) }) {
+                // Ma liste : bouton rond, icône seule (la place manque sur une ligne à côté des autres)
+                OutlinedButton(
+                    onClick = { state.library.toggleFavorite(source.id, item) },
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.size(44.dp),
+                ) {
                     Icon(
                         if (favorite) AppIcons.Star else AppIcons.StarBorder,
-                        contentDescription = null,
+                        contentDescription = if (favorite) "Retirer de ma liste" else "Ajouter à ma liste",
                         tint = if (favorite) Cm.Cyan else Cm.Text,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(20.dp),
                     )
-                    Spacer(Modifier.width(6.dp))
-                    Text(if (favorite) "Dans ma liste" else "Ma liste")
                 }
             }
         }

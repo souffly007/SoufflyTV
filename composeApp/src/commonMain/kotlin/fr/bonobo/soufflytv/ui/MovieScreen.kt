@@ -94,110 +94,83 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
         state.play(source, channels, index)
     }
 
+    val canPlayTrailer = info.trailer != null
     Box(Modifier.fillMaxSize().background(Cm.Background)) {
-        // Grande image en fond, très atténuée
-        val backdrop = info.backdrop ?: info.cover
-        if (backdrop != null) {
-            AsyncImage(
-                model = backdrop,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().alpha(0.18f),
-                contentScale = ContentScale.Crop,
-            )
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(Cm.Background.copy(alpha = 0.4f), Cm.Background)),
-                ),
-            )
-        }
+        DetailBackdrop(info.backdrop ?: info.cover)
 
         Column(Modifier.fillMaxSize()) {
             TopBar(
-                title = movie.name,
+                title = "Détail du film",
                 subtitle = "FILM",
                 onBack = if (isTvBuild) null else ({ state.back() }),
-                actions = {
-                    IconButton(onClick = { state.library.toggleFavorite(source.id, movie) }) {
-                        Icon(
-                            if (favorite) AppIcons.Star else AppIcons.StarBorder,
-                            contentDescription = if (favorite) "Retirer des favoris" else "Ajouter aux favoris",
-                            tint = if (favorite) Cm.Cyan else Cm.TextMuted,
-                        )
-                    }
-                },
             )
 
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val wide = maxWidth >= 600.dp
-                val posterWidth = if (wide) 180.dp else 110.dp
-                Row(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = if (wide) 32.dp else 16.dp, vertical = 12.dp),
-                ) {
-                    Poster(info.cover, Modifier.width(posterWidth).height(posterWidth * 1.5f))
-                    Spacer(Modifier.width(if (wide) 28.dp else 16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(info.name, color = Cm.Text, fontSize = if (wide) 26.sp else 20.sp, fontWeight = FontWeight.Bold)
-                        if (info.meta != null) {
-                            Spacer(Modifier.height(6.dp))
-                            Text(info.meta!!, style = MonoLabel, color = Cm.Cyan)
-                        }
+                val withInfo = maxWidth >= 860.dp
+                val buttonsWidth = if (wide) Modifier.width(320.dp) else Modifier.fillMaxWidth()
+
+                // Titre, infos, résumé, progression puis boutons empilés (Lire / Continuer, Du début, Ma liste, Bande-annonce)
+                val main: @Composable (Modifier) -> Unit = { modifier ->
+                    Column(modifier) {
+                        Text(
+                            info.name,
+                            color = Cm.Text,
+                            fontSize = if (wide) 28.sp else 21.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = if (wide) 32.sp else 25.sp,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        MetaChips(info.meta)
                         Spacer(Modifier.height(12.dp))
                         Text(
                             info.plot?.takeIf { it.isNotBlank() }
                                 ?: if (loading) "Chargement du résumé…" else "Pas de résumé pour ce film.",
                             color = if (info.plot.isNullOrBlank()) Cm.TextMuted else Cm.Text,
-                            fontSize = if (wide) 16.sp else 14.sp,
-                            lineHeight = if (wide) 23.sp else 20.sp,
-                            maxLines = if (wide) 8 else 12,
+                            fontSize = if (wide) 15.sp else 14.sp,
+                            lineHeight = if (wide) 22.sp else 20.sp,
+                            maxLines = if (wide) 6 else 10,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        info.director?.let { Credit("Réalisation", it) }
-                        info.cast?.let { Credit("Avec", it) }
-
-                        Spacer(Modifier.height(20.dp))
-                        // Film commencé : barre de progression au-dessus des boutons
+                        Spacer(Modifier.height(16.dp))
                         if (saved != null && progress != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Progression : ${(progress * 100).toInt()} %", color = Cm.TextMuted, fontSize = 13.sp)
+                                Spacer(Modifier.width(10.dp))
                                 LinearProgressIndicator(
                                     progress = { progress },
-                                    modifier = Modifier.width(220.dp).height(4.dp),
+                                    modifier = Modifier.width(160.dp).height(4.dp),
                                     color = Cm.Cyan,
                                     trackColor = Cm.SurfaceHigher,
                                 )
                                 Spacer(Modifier.width(10.dp))
-                                Text("Arrêté à ${formatDuration(saved)}", color = Cm.TextMuted, fontSize = 13.sp)
+                                Text("arrêté à ${formatDuration(saved)}", color = Cm.TextMuted, fontSize = 13.sp)
                             }
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(12.dp))
                         } else if (watched) {
                             Text("✓ Déjà vu", color = Cm.Success, fontSize = 13.sp)
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(12.dp))
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Button(
-                                onClick = { play(fromStart = false) },
-                                colors = ButtonDefaults.buttonColors(containerColor = Cm.Cyan, contentColor = Cm.OnCyan),
-                                modifier = Modifier
-                                    .focusRequester(playFocus)
-                                    .onFocusChanged { playFocused = it.isFocused },
-                            ) {
-                                Icon(AppIcons.Play, contentDescription = null, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    if (saved != null) "Continuer (${formatDuration(saved)})" else "Lire",
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            DetailPrimaryButton(
+                                if (saved != null) "Continuer la lecture (${formatDuration(saved)})" else "Lire",
+                                AppIcons.Play,
+                                buttonsWidth.focusRequester(playFocus).onFocusChanged { playFocused = it.isFocused },
+                            ) { play(fromStart = false) }
                             if (saved != null) {
-                                OutlinedButton(onClick = { play(fromStart = true) }) { Text("↺ Reprendre du début") }
+                                DetailButton("↺  Reprendre du début", buttonsWidth) { play(fromStart = true) }
                             }
-                        }
-                        // Bande-annonce sur sa propre ligne : la place manque à côté des autres boutons sur téléphone
-                        info.trailer?.let { trailer ->
-                            Spacer(Modifier.height(10.dp))
-                            OutlinedButton(onClick = { trailerError = !openUrl(trailer) }) { Text("▶ Bande-annonce") }
+                            DetailButton(
+                                if (favorite) "Dans ma liste" else "Ajouter à ma liste",
+                                buttonsWidth,
+                                icon = if (favorite) AppIcons.Star else AppIcons.StarBorder,
+                                tint = if (favorite) Cm.Cyan else Cm.Text,
+                            ) { state.library.toggleFavorite(source.id, movie) }
+                            if (canPlayTrailer) {
+                                DetailButton("Bande-annonce", buttonsWidth, icon = AppIcons.Play) {
+                                    trailerError = !openUrl(info.trailer!!)
+                                }
+                            }
                         }
                         if (trailerError) {
                             Spacer(Modifier.height(8.dp))
@@ -207,6 +180,38 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
                                 fontSize = 13.sp,
                             )
                         }
+                    }
+                }
+
+                if (wide) {
+                    Row(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 32.dp, vertical = 16.dp),
+                    ) {
+                        DetailPoster(info.cover, 200.dp, AppIcons.Movie)
+                        Spacer(Modifier.width(28.dp))
+                        main(Modifier.weight(1f))
+                        if (withInfo && (info.director != null || info.cast != null)) {
+                            Spacer(Modifier.width(24.dp))
+                            InfoColumn(info.director, info.cast, modifier = Modifier.width(240.dp))
+                        }
+                    }
+                } else {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                    ) {
+                        Row {
+                            DetailPoster(info.cover, 120.dp, AppIcons.Movie)
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        main(Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(16.dp))
+                        InfoColumn(info.director, info.cast, modifier = Modifier.fillMaxWidth())
                         Spacer(Modifier.height(24.dp))
                     }
                 }
@@ -215,29 +220,4 @@ fun MovieScreen(state: AppState, source: Source, channels: List<Channel>, index:
     }
 }
 
-@Composable
-private fun Poster(url: String?, modifier: Modifier) {
-    Box(
-        modifier.clip(RoundedCornerShape(12.dp)).background(Cm.SurfaceHigher),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(AppIcons.Movie, contentDescription = null, tint = Cm.TextMuted, modifier = Modifier.size(40.dp))
-        if (url != null) {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        }
-    }
-}
 
-@Composable
-private fun Credit(label: String, value: String) {
-    Spacer(Modifier.height(8.dp))
-    Row {
-        Text("$label : ", color = Cm.TextMuted, fontSize = 13.sp)
-        Text(value, color = Cm.Text, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
-}

@@ -96,6 +96,8 @@ import fr.bonobo.soufflytv.player.PlayerOptions
 import fr.bonobo.soufflytv.player.PlayerStatus
 import fr.bonobo.soufflytv.player.TrackOption
 import fr.bonobo.soufflytv.player.VideoPlayer
+import fr.bonobo.soufflytv.player.speedLabel
+import fr.bonobo.soufflytv.player.PLAYBACK_SPEEDS
 import fr.bonobo.soufflytv.player.pickAudioTrack
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.LocalFocusColor
@@ -744,6 +746,23 @@ private fun PlayerTopBar(
                 options = controller.textTracks,
                 allowOff = true,
                 onSelect = controller::selectText,
+                onOpen = onInteract,
+            )
+        }
+        // Vitesse de lecture : films et séries seulement
+        if (channel.type != ItemType.LIVE) {
+            TrackMenu(
+                icon = {
+                    Text(
+                        if (controller.speed == 1f) "1×" else speedLabel(controller.speed),
+                        color = if (controller.speed == 1f) Cm.Text else Cm.Cyan,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
+                options = PLAYBACK_SPEEDS.map { TrackOption(it.toString(), speedLabel(it), selected = controller.speed == it) },
+                allowOff = false,
+                onSelect = { id -> id?.toFloatOrNull()?.let(controller::setSpeed) },
                 onOpen = onInteract,
             )
         }

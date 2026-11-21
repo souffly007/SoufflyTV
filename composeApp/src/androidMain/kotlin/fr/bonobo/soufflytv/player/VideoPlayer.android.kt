@@ -95,6 +95,8 @@ actual fun VideoPlayer(
 
             override fun selectAudio(id: String) = selectTrack(player, C.TRACK_TYPE_AUDIO, id)
 
+            override fun setSpeed(speed: Float) = player.setPlaybackSpeed(speed)
+
             override fun selectText(id: String?) {
                 if (id == null) {
                     player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()

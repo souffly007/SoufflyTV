@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.7.1 && git push origin v0.7.1
+git tag v0.8.0 && git push origin v0.8.0
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -160,7 +160,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
   `↑ ↓` ou `+ −` = zapping, `Espace` = pause. En plein écran, la vidéo occupe tout l'écran et les barres
   reviennent quand la souris bouge. Réglage « Plein écran automatique » pour y passer dès la lecture.
 
-## Fonctions (v0.7)
+## Fonctions (v0.8)
 
 **Sources**
 - [x] M3U par **lien ou fichier importé** (attributs `tvg-*`, `group-title`, `#EXTGRP`, `#EXTVLCOPT`)
@@ -180,6 +180,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 **Bibliothèque**
 - [x] **Bandeau façon TiviMate** (TV) : l'affiche sélectionnée est présentée en grand en haut (image, titre, année · genre · durée · note, distribution, résumé), compteur « 3 / 1017 », note sur chaque affiche
 - [x] **Bande-annonce** (Xtream) : bouton sur la fiche film et la série, ouvre YouTube (appli sur Android / TV, navigateur sur PC)
+- [x] **Fiches film et série** façon maquette : grande image de fond, pastilles d'infos, boutons empilés (Lire / Continuer, Reprendre du début, Ma liste, Bande-annonce), colonne Informations ; séries avec infos à gauche, saisons et épisodes à droite
 - [x] **Fiche film** : affiche, année, genre, durée, note, résumé, réalisation et distribution, puis **Lecture** (ou **Reprendre** / **Depuis le début**)
 - [x] **Masquer des catégories** par source et par rubrique : par pays/groupe d'un coup (FR, UK, DE…), tout masquer / tout afficher, recherche, une par une
 - [x] Favoris et **Récents** par source (catégories en tête de liste), ligne « Reprendre » sur l'accueil
@@ -188,6 +189,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 
 **Lecteur**
 - [x] Commandes par-dessus l'image, masquées après 5 s (Android)
+- [x] **Vitesse de lecture** (×0,75 à ×2) pour les films et séries
 - [x] Pause, barre de progression utilisable à la télécommande, sauts −10 min / −1 min / −10 s / +10 s / +1 min / +10 min, épisode précédent/suivant, **épisode suivant automatique**
 - [x] **Son Dolby (AC3, E-AC3), DTS, TrueHD** sur tous les appareils Android (décodeur FFmpeg en secours de ceux de l'appareil)
 - [x] **Audiodescription** (voix qui décrit l'image) : désactivée par défaut, bouton **AD** dans le lecteur quand la chaîne en propose une, réglage pour l'avoir toujours
@@ -195,7 +197,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] **Image dans l'image** (bouton ou touche Accueil), paysage automatique, écran toujours allumé
 - [x] **Reconnexion automatique** du direct (3 essais), mémoire tampon réglable
 
-**Réglages** : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
+**Réglages** (par rubriques sur grand écran : Lecture, Affichage, Comptes, Données, À propos) : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
 masquage des catégories adultes, effacement de l'historique.
 
 **À venir** : grille du guide TV sur plusieurs heures, contrôle parental par code.
