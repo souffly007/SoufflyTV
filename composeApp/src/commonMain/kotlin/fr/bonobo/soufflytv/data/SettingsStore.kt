@@ -31,6 +31,8 @@ data class Settings(
     val showResumeRow: Boolean = false,
     /** Choisir les pistes d'audiodescription quand elles existent (sinon, la piste normale). */
     val audioDescription: Boolean = false,
+    /** Ordinateur : plein écran dès le lancement d'une chaîne ou d'un film. */
+    val autoFullscreen: Boolean = false,
 )
 
 class SettingsStore(private val scope: CoroutineScope) {

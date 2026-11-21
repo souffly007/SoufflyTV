@@ -88,6 +88,13 @@ fun SettingsScreen(state: AppState) {
                     settings.autoNextEpisode,
                 ) { v -> state.settings.update { it.copy(autoNextEpisode = v) } }
 
+                if (!isAndroid) {
+                    SwitchRow(
+                        "Plein écran automatique",
+                        "Passe en plein écran au lancement d'une chaîne ou d'un film. F ou double-clic : plein écran, Échap : en sortir",
+                        settings.autoFullscreen,
+                    ) { v -> state.settings.update { it.copy(autoFullscreen = v) } }
+                }
                 if (isAndroid && !isTvBuild) {
                     SwitchRow(
                         "Paysage pendant la lecture",

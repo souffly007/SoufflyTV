@@ -70,6 +70,10 @@ class AppState {
 
     /** Ordinateur : bascule la fenêtre en plein écran. */
     var toggleFullscreen: (() -> Unit)? by mutableStateOf<(() -> Unit)?>(null)
+    /** Ordinateur : passer en plein écran (true) ou en revenir (false). */
+    var setFullscreen: ((Boolean) -> Unit)? by mutableStateOf<((Boolean) -> Unit)?>(null)
+    /** Ordinateur : la fenêtre est en plein écran. */
+    var isFullscreen by mutableStateOf(false)
 
     /** Android : passe en image dans l'image (null si l'appareil ne le permet pas). */
     var enterPictureInPicture: (() -> Unit)? by mutableStateOf<(() -> Unit)?>(null)

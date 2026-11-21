@@ -91,6 +91,11 @@ class PlayerController {
     var textTracks by mutableStateOf<List<TrackOption>>(emptyList())
     var aspect by mutableStateOf(AspectMode.FIT)
 
+    /** Ordinateur : la souris bouge ou clique sur la vidéo (fenêtre native, hors de Compose). */
+    var onSurfaceActivity: (() -> Unit)? = null
+    /** Ordinateur : double-clic sur la vidéo. */
+    var onSurfaceDoubleClick: (() -> Unit)? = null
+
     private var impl: PlayerImpl? = null
 
     fun attach(player: PlayerImpl) {

@@ -3,6 +3,7 @@ package fr.bonobo.soufflytv
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -23,12 +24,16 @@ fun main() {
         val windowState = rememberWindowState(width = 1200.dp, height = 760.dp)
 
         DisposableEffect(Unit) {
+            state.setFullscreen = { on ->
+                windowState.placement = if (on) WindowPlacement.Fullscreen else WindowPlacement.Floating
+            }
             state.toggleFullscreen = {
-                windowState.placement =
-                    if (windowState.placement == WindowPlacement.Fullscreen) WindowPlacement.Floating
-                    else WindowPlacement.Fullscreen
+                state.setFullscreen?.invoke(windowState.placement != WindowPlacement.Fullscreen)
             }
             onDispose { state.close() }
+        }
+        LaunchedEffect(windowState) {
+            snapshotFlow { windowState.placement }.collect { state.isFullscreen = it == WindowPlacement.Fullscreen }
         }
 
         Window(

@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.6.3 && git push origin v0.6.3
+git tag v0.6.4 && git push origin v0.6.4
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -154,8 +154,9 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
 
 - **Téléphone** : bouton ☰ dans la barre du lecteur pour la liste des chaînes ; toucher l'image affiche les commandes,
   double-toucher à gauche/droite recule/avance de 10 s.
-- **PC** : `Entrée` = liste des chaînes (à gauche de la vidéo), `Échap` = retour, `F` = plein écran,
-  `↑ ↓` ou `+ −` = zapping, `Espace` = pause.
+- **PC** : `Entrée` = liste des chaînes, `Échap` = retour (ou sortie du plein écran), `F` ou **double-clic** = plein écran,
+  `↑ ↓` ou `+ −` = zapping, `Espace` = pause. En plein écran, la vidéo occupe tout l'écran et les barres
+  apparaissent quand la souris bouge. Réglage « Plein écran automatique » pour y passer dès la lecture.
 
 ## Fonctions (v0.6)
 

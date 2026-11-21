@@ -24,6 +24,8 @@ import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import uk.co.caprica.vlcj.player.component.CallbackMediaPlayerComponent
 import uk.co.caprica.vlcj.player.component.EmbeddedMediaPlayerComponent
 import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import java.io.File
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
@@ -96,7 +98,12 @@ private val vlcFactory: MediaPlayerFactory? by lazy {
     }
 }
 
-private class Vlc(val panel: JComponent, val player: EmbeddedMediaPlayer, val release: () -> Unit)
+private class Vlc(
+    val panel: JComponent,
+    val surface: java.awt.Component,
+    val player: EmbeddedMediaPlayer,
+    val release: () -> Unit,
+)
 
 private fun createVlc(): Vlc? {
     val factory = vlcFactory ?: return null
@@ -104,12 +111,12 @@ private fun createVlc(): Vlc? {
         val vlc = if (isMac) {
             val c = CallbackMediaPlayerComponent(factory, null, InputEvents.NONE, true, null)
             c.videoSurfaceComponent().isFocusable = false
-            Vlc(c, c.mediaPlayer()) { c.release() }
+            Vlc(c, c.videoSurfaceComponent(), c.mediaPlayer()) { c.release() }
         } else {
             // Rendu natif (le plus économe) sous Linux (X11 / XWayland) et Windows
             val c = EmbeddedMediaPlayerComponent(factory, null, null, InputEvents.NONE, null)
             c.videoSurfaceComponent().isFocusable = false
-            Vlc(c, c.mediaPlayer()) { c.release() } // libère le lecteur, pas l'instance partagée
+            Vlc(c, c.videoSurfaceComponent(), c.mediaPlayer()) { c.release() } // libère le lecteur, pas l'instance partagée
         }
         vlc.panel.isFocusable = false // le clavier reste à Compose
         vlc
@@ -159,6 +166,21 @@ actual fun VideoPlayer(
         }
         vlc.player.events().addMediaPlayerEventListener(listener)
 
+        // Souris sur la vidéo : afficher les commandes (plein écran), double-clic = plein écran
+        val mouse = object : MouseAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                controller.onSurfaceActivity?.invoke()
+            }
+
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.clickCount == 2) controller.onSurfaceDoubleClick?.invoke() else controller.onSurfaceActivity?.invoke()
+            }
+        }
+        listOf(vlc.surface, vlc.panel).distinct().forEach {
+            it.addMouseListener(mouse)
+            it.addMouseMotionListener(mouse)
+        }
+
         controller.attach(object : PlayerImpl {
             override fun togglePause() = vlc.player.controls().setPause(vlc.player.status().isPlaying)
 
@@ -174,6 +196,10 @@ actual fun VideoPlayer(
         })
 
         onDispose {
+            listOf(vlc.surface, vlc.panel).distinct().forEach {
+                it.removeMouseListener(mouse)
+                it.removeMouseMotionListener(mouse)
+            }
             controller.detach()
             vlc.player.events().removeMediaPlayerEventListener(listener)
             vlc.player.controls().stop()
