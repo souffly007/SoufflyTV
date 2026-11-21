@@ -16,12 +16,13 @@ import fr.bonobo.soufflytv.ui.PlayerScreen
 import fr.bonobo.soufflytv.ui.SeriesScreen
 import fr.bonobo.soufflytv.ui.SettingsScreen
 import fr.bonobo.soufflytv.ui.SourcesScreen
+import androidx.compose.ui.graphics.Color
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.SoufflyTheme
 
 @Composable
 fun App(state: AppState) {
-    SoufflyTheme {
+    SoufflyTheme(focusColor = Color(state.settings.value.focusColor.argb)) {
         Surface(Modifier.fillMaxSize(), color = Cm.Background) {
             when (val screen = state.screen) {
                 is Screen.Player -> PlayerScreen(state, screen)

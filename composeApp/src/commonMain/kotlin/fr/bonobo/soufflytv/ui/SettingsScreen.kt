@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.bonobo.soufflytv.AppState
+import fr.bonobo.soufflytv.data.FocusColor
 import fr.bonobo.soufflytv.platform.isAndroid
 import fr.bonobo.soufflytv.platform.isTvBuild
 import fr.bonobo.soufflytv.player.AspectMode
@@ -110,6 +111,25 @@ fun SettingsScreen(state: AppState) {
 
                 Spacer(Modifier.height(12.dp))
                 SectionLabel("AFFICHAGE", Modifier.padding(start = 14.dp, top = 8.dp, bottom = 6.dp))
+                Text(
+                    "Couleur du curseur",
+                    color = Cm.Text,
+                    fontSize = 15.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                )
+                Text(
+                    "Cadre qui montre où tu te trouves à la télécommande ou au clavier",
+                    color = Cm.TextMuted,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                )
+                Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FocusColor.entries.forEach { color ->
+                        Pill(color.label, selected = settings.focusColor == color) {
+                            state.settings.update { it.copy(focusColor = color) }
+                        }
+                    }
+                }
                 SwitchRow(
                     "Bandeau « Reprendre » sur l'accueil",
                     "Affiche les dernières chaînes regardées au-dessus des sources",

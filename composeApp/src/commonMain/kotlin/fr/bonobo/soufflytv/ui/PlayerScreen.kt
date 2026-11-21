@@ -98,6 +98,7 @@ import fr.bonobo.soufflytv.player.TrackOption
 import fr.bonobo.soufflytv.player.VideoPlayer
 import fr.bonobo.soufflytv.player.pickAudioTrack
 import fr.bonobo.soufflytv.ui.theme.Cm
+import fr.bonobo.soufflytv.ui.theme.LocalFocusColor
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -1032,7 +1033,7 @@ private fun SeekBar(position: Long, duration: Long, onSeek: (Long) -> Unit, onIn
                     .offset { IntOffset((fraction * widthPx).toInt() - thumbPx / 2, 0) }
                     .size(if (focused) 20.dp else 14.dp)
                     .background(Cm.Cyan, CircleShape)
-                    .then(if (focused) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
+                    .then(if (focused) Modifier.border(3.dp, LocalFocusColor.current, CircleShape) else Modifier)
             )
         }
         Text(

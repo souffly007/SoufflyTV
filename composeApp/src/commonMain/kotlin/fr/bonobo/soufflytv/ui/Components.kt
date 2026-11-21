@@ -60,6 +60,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.widthIn
 import coil3.compose.AsyncImage
 import fr.bonobo.soufflytv.ui.theme.Cm
+import fr.bonobo.soufflytv.ui.theme.LocalFocusColor
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
 
 /**
@@ -96,16 +98,23 @@ fun Modifier.tvClickable(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val hovered by interaction.collectIsHoveredAsState()
+    val focusColor = LocalFocusColor.current
     val background = when {
-        focused -> Cm.SurfaceHigher
+        focused -> focusColor.copy(alpha = 0.22f)
         selected -> Cm.CyanGlow
         hovered -> Cm.SurfaceHigh
         else -> Color.Transparent
     }
+    // Télécommande : l'élément qui a le focus grossit un peu, avec un cadre épais de couleur vive
+    val scale = if (focused && isKeyNavigation()) 1.04f else 1f
     return this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
         .clip(shape)
         .background(background)
-        .then(if (focused) Modifier.border(2.dp, Cm.Cyan, shape) else Modifier)
+        .then(if (focused) Modifier.border(3.dp, focusColor, shape) else Modifier)
         .hoverable(interaction)
         .combinedClickable(
             interactionSource = interaction,

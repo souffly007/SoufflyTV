@@ -1,8 +1,14 @@
 package fr.bonobo.soufflytv.ui.theme
 
+import androidx.compose.material.ripple.RippleAlpha
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RippleConfiguration
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -61,7 +67,26 @@ private val CyanogenScheme = darkColorScheme(
     onError = Color.Black,
 )
 
+/** Couleur du « curseur » de la télécommande (réglable). */
+val LocalFocusColor = staticCompositionLocalOf { Color(0xFFFFD600) }
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SoufflyTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = CyanogenScheme, content = content)
+fun SoufflyTheme(focusColor: Color = Color(0xFFFFD600), content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = CyanogenScheme) {
+        CompositionLocalProvider(
+            LocalFocusColor provides focusColor,
+            // Boutons Material (Lecture, icônes du lecteur…) : fond bien visible quand ils ont le focus
+            LocalRippleConfiguration provides RippleConfiguration(
+                color = focusColor,
+                rippleAlpha = RippleAlpha(
+                    draggedAlpha = 0.16f,
+                    focusedAlpha = 0.42f,
+                    hoveredAlpha = 0.10f,
+                    pressedAlpha = 0.30f,
+                ),
+            ),
+            content = content,
+        )
+    }
 }

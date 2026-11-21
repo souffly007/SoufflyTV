@@ -33,7 +33,17 @@ data class Settings(
     val audioDescription: Boolean = false,
     /** Ordinateur : plein écran dès le lancement d'une chaîne ou d'un film. */
     val autoFullscreen: Boolean = false,
+    /** Couleur qui montre où l'on se trouve à la télécommande. */
+    val focusColor: FocusColor = FocusColor.YELLOW,
 )
+
+/** Couleur du « curseur » de la télécommande : bien distincte du cyan qui marque la sélection. */
+enum class FocusColor(val label: String, val argb: Long) {
+    YELLOW("Jaune", 0xFFFFD600),
+    ORANGE("Orange", 0xFFFF9100),
+    WHITE("Blanc", 0xFFFFFFFF),
+    CYAN("Cyan", 0xFF00D4EC),
+}
 
 class SettingsStore(private val scope: CoroutineScope) {
 

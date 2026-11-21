@@ -15,9 +15,13 @@ sealed interface PlayerStatus {
     data class Error(val message: String) : PlayerStatus
 }
 
+/**
+ * Format d'image, adapté à l'écran quel que soit son rapport (16:9, 16:10, 21:9…) :
+ * FIT = image entière avec bandes noires, WIDE = étirée pour remplir, ZOOM = agrandie et rognée pour remplir.
+ */
 enum class AspectMode(val label: String) {
     FIT("Original"),
-    WIDE("16:9"),
+    WIDE("Remplir"),
     ZOOM("Zoom");
 
     fun next(): AspectMode = entries[(ordinal + 1) % entries.size]

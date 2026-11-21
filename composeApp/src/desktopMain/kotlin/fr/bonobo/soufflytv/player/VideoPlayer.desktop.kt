@@ -229,7 +229,7 @@ actual fun VideoPlayer(
 
     // Position, durée, pistes et format d'image
     LaunchedEffect(vlc) {
-        var appliedAspect: AspectMode? = null
+        var appliedAspect: String? = null
         while (true) {
             val player = vlc.player
             controller.isPlaying = player.status().isPlaying
@@ -262,8 +262,12 @@ actual fun VideoPlayer(
                     .map { TrackOption(it.id().toString(), it.description() ?: "Sous-titres ${it.id()}", it.id() == textCurrent) }
                 if (text != controller.textTracks) controller.textTracks = text
 
+                // Format : calculé sur la taille réelle de la vidéo à l'écran (16:9, 16:10, 21:9…),
+                // et recalculé quand elle change (plein écran, fenêtre redimensionnée)
                 val aspect = controller.aspect
-                if (aspect != appliedAspect) {
+                val ratio = screenRatio(vlc.panel.width, vlc.panel.height)
+                val applied = "$aspect|$ratio"
+                if (applied != appliedAspect) {
                     when (aspect) {
                         AspectMode.FIT -> {
                             player.video().setAspectRatio(null)
@@ -271,14 +275,14 @@ actual fun VideoPlayer(
                         }
                         AspectMode.WIDE -> {
                             player.video().setCropGeometry(null)
-                            player.video().setAspectRatio("16:9")
+                            player.video().setAspectRatio(ratio)
                         }
                         AspectMode.ZOOM -> {
                             player.video().setAspectRatio(null)
-                            player.video().setCropGeometry("16:9")
+                            player.video().setCropGeometry(ratio)
                         }
                     }
-                    appliedAspect = aspect
+                    appliedAspect = applied
                 }
             }
             delay(500)
@@ -294,3 +298,11 @@ actual fun VideoPlayer(
 
 /** VLC décrit une piste par « Piste 1 - [Français] » : la langue est entre crochets. */
 private val LANGUAGE_IN_BRACKETS = Regex("""\[([^\]]+)]\s*$""")
+
+/** Rapport largeur:hauteur simplifié, par exemple 1920×1080 → « 16:9 », 2560×1080 → « 64:27 ». */
+private fun screenRatio(width: Int, height: Int): String {
+    if (width <= 0 || height <= 0) return "16:9"
+    tailrec fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
+    val d = gcd(width, height)
+    return "${width / d}:${height / d}"
+}

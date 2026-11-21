@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.6.5 && git push origin v0.6.5
+git tag v0.6.6 && git push origin v0.6.6
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -187,11 +187,11 @@ et aux réglages (flèche haut depuis les catégories). Le focus revient toujour
 - [x] Pause, barre de progression utilisable à la télécommande, sauts −10 min / −1 min / −10 s / +10 s / +1 min / +10 min, épisode précédent/suivant, **épisode suivant automatique**
 - [x] **Son Dolby (AC3, E-AC3), DTS, TrueHD** sur tous les appareils Android (décodeur FFmpeg en secours de ceux de l'appareil)
 - [x] **Audiodescription** (voix qui décrit l'image) : désactivée par défaut, bouton **AD** dans le lecteur quand la chaîne en propose une, réglage pour l'avoir toujours
-- [x] Choix de la **piste audio** et des **sous-titres**, **format d'image** (Original, 16:9, Zoom)
+- [x] Choix de la **piste audio** et des **sous-titres**, **format d'image** adapté à l'écran, 16:9, 16:10, 21:9… (Original, Remplir, Zoom)
 - [x] **Image dans l'image** (bouton ou touche Accueil), paysage automatique, écran toujours allumé
 - [x] **Reconnexion automatique** du direct (3 essais), mémoire tampon réglable
 
-**Réglages** : démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
+**Réglages** : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
 masquage des catégories adultes, effacement de l'historique.
 
 **À venir** : grille du guide TV sur plusieurs heures, contrôle parental par code.
