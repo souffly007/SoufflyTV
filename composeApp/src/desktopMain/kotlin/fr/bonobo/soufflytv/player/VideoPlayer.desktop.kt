@@ -315,3 +315,6 @@ private fun screenRatio(width: Int, height: Int): String {
     val d = gcd(width, height)
     return "${width / d}:${height / d}"
 }
+
+/** Ordinateur : pas de changement de fréquence d'écran. */
+actual fun restoreDisplayMode() = Unit

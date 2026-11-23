@@ -36,7 +36,12 @@ enum class BufferMode(val label: String) {
 data class PlayerOptions(
     val live: Boolean,
     val buffer: BufferMode,
+    /** TV : passer l'écran à la fréquence de la vidéo (AFR). */
+    val autoFrameRate: Boolean = false,
 )
+
+/** AFR : rend le mode d'affichage d'origine (à la sortie du lecteur). */
+expect fun restoreDisplayMode()
 
 data class TrackOption(
     val id: String,

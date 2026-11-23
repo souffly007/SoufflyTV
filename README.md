@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.9.4 && git push origin v0.9.4
+git tag v0.9.5 && git push origin v0.9.5
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -197,6 +197,9 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] Dans le guide TV : ⟲ sur les émissions terminées qu'on peut revoir, OK pour les relire
 - [x] Lecture comme un film (avance, recul, pause, vitesse), choix SD / HD / FHD si plusieurs versions ont des archives
 - [x] Xtream (`tv_archive`, lien `timeshift`, fuseau du serveur), M3U (`catchup` default / append / shift / flussonic / xc, `catchup-days`, `catchup-source`), Stalker (archives du portail)
+
+**Image (TV)**
+- [x] **Fréquence d'image automatique (AFR)** : l'écran passe à la fréquence de la vidéo (25 i/s → 50 Hz, 29,97 → 59,94 Hz, 23,976 → 23,976 Hz…), annoncée par le flux ou mesurée sur les premières images ; retour au mode d'origine en quittant le lecteur (réglage, désactivé par défaut)
 
 **Réseau**
 - [x] **DNS sécurisé** (DNS-over-HTTPS) : Cloudflare, Quad9 ou Google au lieu du DNS de la box, pour joindre les serveurs bloqués par l'opérateur ;

@@ -38,6 +38,8 @@ data class Settings(
     val focusColor: FocusColor = FocusColor.YELLOW,
     /** TV en direct, grand écran : la chaîne survolée se lance en petit au-dessus de la liste. */
     val livePreview: Boolean = true,
+    /** TV : fréquence d'image automatique (l'écran suit la vidéo : 50 Hz, 59,94 Hz, 23,976 Hz…). */
+    val autoFrameRate: Boolean = false,
     /** Serveur DNS utilisé pour joindre les sources (contourne le blocage par le DNS de la box). */
     val dns: DnsMode = DnsMode.SYSTEM,
     /** Guide TV : dernière qualité choisie (SD, HD, FHD, UHD…), proposée en premier la fois suivante. */

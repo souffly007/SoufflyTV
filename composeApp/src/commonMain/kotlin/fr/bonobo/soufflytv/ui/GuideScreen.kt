@@ -184,7 +184,7 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
             start = selection?.start,
             clock = clock,
             compact = compact,
-            onWatch = if (remoteNavigation()) null else selectedGroup?.let { g -> { play(g) } },
+            onWatch = if (remoteNavigation()) null else selectedGroup?.let { g -> { programme -> play(g, programme) } },
         )
 
         val density = LocalDensity.current
@@ -318,7 +318,7 @@ private fun GuideDetail(
     start: Long?,
     clock: Long,
     compact: Boolean,
-    onWatch: (() -> Unit)?,
+    onWatch: ((Programme?) -> Unit)?,
 ) {
     val height = if (compact) 104.dp else 128.dp
     Row(
@@ -351,7 +351,7 @@ private fun androidx.compose.foundation.layout.RowScope.GuideDetailContent(
     start: Long?,
     clock: Long,
     compact: Boolean,
-    onWatch: (() -> Unit)?,
+    onWatch: ((Programme?) -> Unit)?,
 ) {
     run {
         val programmes by produceState(initialValue = emptyList<Programme>(), group.key, model.epgVersion) {
@@ -402,7 +402,7 @@ private fun androidx.compose.foundation.layout.RowScope.GuideDetailContent(
         if (onWatch != null) {
             Spacer(Modifier.width(10.dp))
             Button(
-                onClick = onWatch,
+                onClick = { onWatch(programme) },
                 colors = ButtonDefaults.buttonColors(containerColor = Cm.Cyan, contentColor = Cm.OnCyan),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp),

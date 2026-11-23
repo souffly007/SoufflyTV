@@ -1,6 +1,11 @@
 package fr.bonobo.soufflytv.player
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import androidx.media3.exoplayer.video.VideoFrameMetadataListener
+import fr.bonobo.soufflytv.data.estimateFrameRate
+import java.util.concurrent.atomic.AtomicBoolean
 import android.view.ViewGroup
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
@@ -91,6 +96,32 @@ actual fun VideoPlayer(
         }
         player.addListener(listener)
 
+        // AFR : fréquence annoncée par le flux, sinon mesurée sur les premières images, puis mode de la TV
+        val activity = context.findActivity()
+        val frameTimes = ArrayList<Long>()
+        val decided = AtomicBoolean(!options.autoFrameRate || activity == null)
+        val mainHandler = Handler(Looper.getMainLooper())
+        fun decide(fps: Float) {
+            if (decided.getAndSet(true)) return
+            mainHandler.post { activity?.let { runCatching { FrameRateSwitcher.apply(it, fps) } } }
+        }
+        val frameListener = VideoFrameMetadataListener { presentationTimeUs, _, format, _ ->
+            if (decided.get()) return@VideoFrameMetadataListener
+            if (format.frameRate > 0f) {
+                decide(format.frameRate)
+                return@VideoFrameMetadataListener
+            }
+            frameTimes += presentationTimeUs
+            if (frameTimes.size >= 48) {
+                val fps = estimateFrameRate(frameTimes)
+                when {
+                    fps != null -> decide(fps)
+                    frameTimes.size > 240 -> decided.set(true) // fréquence introuvable : on n'y touche pas
+                }
+            }
+        }
+        if (!decided.get()) player.setVideoFrameMetadataListener(frameListener)
+
         controller.attach(object : PlayerImpl {
             override fun togglePause() {
                 if (player.isPlaying) player.pause() else player.play()
@@ -134,6 +165,8 @@ actual fun VideoPlayer(
         onDispose {
             lifecycle?.removeObserver(observer)
             controller.detach()
+            player.clearVideoFrameMetadataListener(frameListener)
+            mainHandler.removeCallbacksAndMessages(null)
             player.removeListener(listener)
             player.release()
         }
@@ -294,3 +327,5 @@ private fun describe(error: PlaybackException): String = when (error.errorCode) 
     PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> "Format vidéo non pris en charge"
     else -> "Lecture impossible (${error.errorCodeName.removePrefix("ERROR_CODE_")})"
 }
+
+actual fun restoreDisplayMode() = FrameRateSwitcher.restore()

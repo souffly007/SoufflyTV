@@ -96,6 +96,14 @@ fun SettingsScreen(state: AppState) {
                         settings.livePreview,
                     ) { v -> state.settings.update { it.copy(livePreview = v) } }
                 }
+                if (isTvBuild) {
+                    SwitchRow(
+                        "Fréquence d'image automatique (AFR)",
+                        "La TV passe à la fréquence de la vidéo (50 Hz, 59,94 Hz, 23,976 Hz…) pour une image plus fluide. " +
+                            "Un écran noir d'une ou deux secondes est normal au changement",
+                        settings.autoFrameRate,
+                    ) { v -> state.settings.update { it.copy(autoFrameRate = v) } }
+                }
                 SwitchRow(
                     "Audiodescription",
                     "Une voix décrit l'image, pour les personnes malvoyantes. Désactivée : la piste normale est choisie. Aussi via le bouton AD du lecteur",

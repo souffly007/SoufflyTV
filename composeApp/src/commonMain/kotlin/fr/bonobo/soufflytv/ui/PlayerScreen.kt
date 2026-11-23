@@ -86,6 +86,7 @@ import fr.bonobo.soufflytv.data.toUserMessage
 import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.ItemType
 import fr.bonobo.soufflytv.model.isReplay
+import fr.bonobo.soufflytv.player.restoreDisplayMode
 import fr.bonobo.soufflytv.model.Programme
 import fr.bonobo.soufflytv.model.StreamRequest
 import fr.bonobo.soufflytv.platform.FullscreenEffect
@@ -123,6 +124,8 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
     val channel = playlist[index.coerceIn(0, playlist.lastIndex)]
     // Un replay se lit comme un film (avance, recul, pause), pas comme le direct
     val live = channel.type == ItemType.LIVE && !channel.isReplay
+    // AFR : en quittant le lecteur, la TV revient à sa fréquence d'origine
+    DisposableEffect(Unit) { onDispose { restoreDisplayMode() } }
     val resumeKey = "${source.id}|${channel.id}"
 
     var aspect by remember { mutableStateOf(settings.aspect) }
@@ -447,7 +450,7 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
                     VideoPlayer(
                         request = req,
                         controller = controller,
-                        options = PlayerOptions(live = live, buffer = settings.buffer),
+                        options = PlayerOptions(live = live, buffer = settings.buffer, autoFrameRate = settings.autoFrameRate),
                         modifier = Modifier.fillMaxSize(),
                         onStatus = { status = it },
                     )
