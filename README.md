@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.8.1 && git push origin v0.8.1
+git tag v0.9.1 && git push origin v0.9.1
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -160,7 +160,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
   `↑ ↓` ou `+ −` = zapping, `Espace` = pause. En plein écran, la vidéo occupe tout l'écran et les barres
   reviennent quand la souris bouge. Réglage « Plein écran automatique » pour y passer dès la lecture.
 
-## Fonctions (v0.8)
+## Fonctions (v0.9)
 
 **Sources**
 - [x] M3U par **lien ou fichier importé** (attributs `tvg-*`, `group-title`, `#EXTGRP`, `#EXTVLCOPT`)
@@ -177,6 +177,21 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] Guide **enregistré sur l'appareil** (affiché dès l'ouverture), rafraîchi en arrière-plan toutes les 6 h
 - [x] Guide **partagé entre les versions** d'une même chaîne (TF1 SD / HD / FHD / 4K…)
 
+**Interface**
+- [x] **Smartphone** façon maquette : en-tête (logo, recherche, compte), barre du bas Accueil · TV Live · Films · Séries · Réglages,
+  carrousel « À la une » qui défile tout seul, grande carte **Continuer à regarder** (pourcentage, temps restant, Continuer / Reprendre du début), rangées avec « Tout voir »
+- [x] **Grand écran / TV** : barre latérale (Recherche, Accueil, TV en direct, Films, Séries, Filtres, Réglages, compte)
+- [x] **Recherche** dans tout le compte (chaînes, films et séries) ; « Tout voir » ouvre l'historique complet
+
+**TV en direct**
+- [x] **Aperçu en direct** (TV) : la chaîne sous le curseur se lance en petit en haut de la liste, avec l'émission en cours, la suivante et la progression ; OK pour passer en plein écran (réglage pour le couper)
+- [x] **« En ce moment »** : ce qui passe maintenant sur toutes les chaînes, rangé par catégorie, avec le temps restant (quand un guide TV est chargé)
+
+**Réseau**
+- [x] **DNS sécurisé** (DNS-over-HTTPS) : Cloudflare, Quad9 ou Google au lieu du DNS de la box, pour joindre les serveurs bloqués par l'opérateur ;
+  s'applique aux listes, au guide TV, aux affiches et à la vidéo (sur PC, VLC passe par un petit relais local), repli automatique sur le DNS de l'appareil si le DNS chiffré ne répond pas
+- [x] **Test** depuis les réglages : compare, pour chaque compte, l'adresse donnée par la box et par le DNS sécurisé
+
 **Bibliothèque**
 - [x] **Bandeau façon TiviMate** (TV) : l'affiche sélectionnée est présentée en grand en haut (image, titre, année · genre · durée · note, distribution, résumé), compteur « 3 / 1017 », note sur chaque affiche
 - [x] **Bande-annonce** (Xtream) : bouton sur la fiche film et la série, ouvre YouTube (appli sur Android / TV, navigateur sur PC)
@@ -189,6 +204,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 
 **Lecteur**
 - [x] Commandes par-dessus l'image, masquées après 5 s (Android)
+- [x] **Gros boutons ronds** par-dessus l'image (Android, films et séries) : −10 s, lecture / pause, +10 s
 - [x] **Vitesse de lecture** (×0,75 à ×2) pour les films et séries
 - [x] Pause, barre de progression utilisable à la télécommande, sauts −10 min / −1 min / −10 s / +10 s / +1 min / +10 min, épisode précédent/suivant, **épisode suivant automatique**
 - [x] **Son Dolby (AC3, E-AC3), DTS, TrueHD** sur tous les appareils Android (décodeur FFmpeg en secours de ceux de l'appareil)
@@ -197,7 +213,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] **Image dans l'image** (bouton ou touche Accueil), paysage automatique, écran toujours allumé
 - [x] **Reconnexion automatique** du direct (3 essais), mémoire tampon réglable
 
-**Réglages** (par rubriques sur grand écran : Lecture, Affichage, Comptes, Données, À propos) : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
+**Réglages** (par rubriques sur grand écran : Lecture, Affichage, Réseau, Comptes, Données, À propos) : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
 masquage des catégories adultes, effacement de l'historique.
 
 **À venir** : grille du guide TV sur plusieurs heures, contrôle parental par code.

@@ -3,6 +3,7 @@ package fr.bonobo.soufflytv.data
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import fr.bonobo.soufflytv.platform.applyDnsMode
 import fr.bonobo.soufflytv.platform.readAppFile
 import fr.bonobo.soufflytv.platform.writeAppFile
 import fr.bonobo.soufflytv.player.AspectMode
@@ -35,7 +36,25 @@ data class Settings(
     val autoFullscreen: Boolean = false,
     /** Couleur qui montre où l'on se trouve à la télécommande. */
     val focusColor: FocusColor = FocusColor.YELLOW,
+    /** TV en direct, grand écran : la chaîne survolée se lance en petit au-dessus de la liste. */
+    val livePreview: Boolean = true,
+    /** Serveur DNS utilisé pour joindre les sources (contourne le blocage par le DNS de la box). */
+    val dns: DnsMode = DnsMode.SYSTEM,
 )
+
+/**
+ * DNS chiffré (DNS-over-HTTPS) : l'adresse des serveurs est demandée directement à Cloudflare,
+ * Quad9 ou Google, sans passer par le DNS de la box ou de l'opérateur.
+ */
+enum class DnsMode(val label: String, val detail: String) {
+    SYSTEM("Appareil", "DNS de la box ou de l'opérateur (réglage du système)"),
+    CLOUDFLARE("Cloudflare", "1.1.1.1 — rapide, sans filtrage"),
+    QUAD9("Quad9", "9.9.9.9 — bloque en plus les sites malveillants"),
+    GOOGLE("Google", "8.8.8.8"),
+}
+
+/** Résultat du test : adresse donnée par le DNS de l'appareil et par le DNS sécurisé. */
+data class DnsCheck(val host: String, val system: String, val secure: String, val differs: Boolean)
 
 /** Couleur du « curseur » de la télécommande : bien distincte du cyan qui marque la sélection. */
 enum class FocusColor(val label: String, val argb: Long) {
@@ -62,10 +81,12 @@ class SettingsStore(private val scope: CoroutineScope) {
         } catch (e: Exception) {
             Settings()
         }
+        applyDnsMode(value.dns)
     }
 
     fun update(transform: (Settings) -> Settings) {
         value = transform(value)
+        applyDnsMode(value.dns)
         val snapshot = value
         scope.launch { writeAppFile(FILE, json.encodeToString(Settings.serializer(), snapshot)) }
     }

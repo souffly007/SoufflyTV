@@ -3,8 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 // Version de SoufflyTV, la même pour Android et pour les installeurs PC (à changer ici seulement)
-val appVersion = "0.8.1"
-val appVersionCode = 26
+val appVersion = "0.9.1"
+val appVersionCode = 28
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -50,11 +50,17 @@ kotlin {
             implementation(libs.media3.ui)
             // Son AC3 / E-AC3 / DTS / TrueHD des films et séries sur les appareils sans décodeur Dolby
             implementation(libs.media3.ffmpeg.decoder)
+            // DNS sécurisé : la vidéo passe par OkHttp quand il est activé
+            implementation(libs.media3.datasource.okhttp)
+            implementation(libs.okhttp)
+            implementation(libs.okhttp.dnsoverhttps)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.okhttp)
+            implementation(libs.okhttp.dnsoverhttps)
             implementation(libs.vlcj)
         }
     }

@@ -2,12 +2,15 @@ package fr.bonobo.soufflytv.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -104,7 +107,9 @@ fun BrowserScreen(state: AppState, source: Source) {
                     Spacer(Modifier.width(if (remote) RAIL_COLLAPSED else RAIL_EXPANDED).fillMaxHeight())
                     Box(Modifier.weight(1f).fillMaxHeight()) {
                         val error = model.error
+                        val extra = model.extraPage
                         when {
+                            extra != null -> ExtraPageContent(state, source, model, extra, Modifier.fillMaxSize(), compact = false)
                             model.showHome -> HomePage(state, source, model, Modifier.fillMaxSize())
                             model.categoriesLoading && !model.loadedOnce -> LoadingBox("Connexion à la source…")
                             error != null && !model.loadedOnce -> ErrorBox(error, onRetry = model::retry)
@@ -128,42 +133,134 @@ fun BrowserScreen(state: AppState, source: Source) {
             return@BoxWithConstraints
         }
 
+        // Smartphone : en-tête (logo, recherche, compte), contenu, barre de navigation en bas
         Column(Modifier.fillMaxSize()) {
-            TopBar(
-                title = source.name,
-                subtitle = "${source.kindLabel} · ${source.detail}",
-                onBack = { state.back() },
-                actions = {
-                    if (model.loadedOnce) {
-                        TextButtonIcon(
-                            label = if (model.hiddenCount > 0) "Catégories (${model.hiddenCount} masquées)" else "Catégories",
-                            showLabel = false,
-                            onClick = manage,
-                        )
-                    }
-                },
+            PhoneHeader(
+                source = source,
+                showFilters = model.loadedOnce && !model.showHome && model.extraPage == null,
+                hiddenCount = model.hiddenCount,
+                onSearch = { model.openExtra(ExtraPage.SEARCH) },
+                onFilters = manage,
+                onAccounts = { state.home() },
             )
-            if (model.sections.size > 1) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    model.sections.forEach { s ->
-                        Pill(s.label, selected = s == model.section) { model.selectSection(s) }
-                    }
-                }
-            }
-
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 val error = model.error
+                val extra = model.extraPage
                 when {
+                    extra != null -> ExtraPageContent(state, source, model, extra, Modifier.fillMaxSize(), compact = true)
+                    model.showHome -> HomePage(state, source, model, Modifier.fillMaxSize(), compact = true)
                     model.categoriesLoading && !model.loadedOnce -> LoadingBox("Connexion à la source…")
                     error != null && !model.loadedOnce -> ErrorBox(error, onRetry = model::retry)
                     model.showChannels -> ChannelPane(state, source, model, Modifier.fillMaxSize(), showBack = true, wide = false)
                     else -> CategoryPane(model, Modifier.fillMaxSize())
                 }
             }
+            PhoneBottomBar(model, onSettings = { state.navigate(Screen.Settings) })
         }
+    }
+}
+
+/** En-tête smartphone : « SoufflyTV », puis recherche, filtres (dans une rubrique) et compte. */
+@Composable
+private fun PhoneHeader(
+    source: Source,
+    showFilters: Boolean,
+    hiddenCount: Int,
+    onSearch: () -> Unit,
+    onFilters: () -> Unit,
+    onAccounts: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().height(58.dp).padding(start = 16.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("S", color = Cm.Cyan, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("oufflyTV", color = Cm.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onSearch) {
+                Icon(AppIcons.Search, contentDescription = "Rechercher", tint = Cm.Text)
+            }
+            if (showFilters) {
+                IconButton(onClick = onFilters) {
+                    Icon(
+                        AppIcons.Filter,
+                        contentDescription = if (hiddenCount > 0) "Catégories ($hiddenCount masquées)" else "Catégories",
+                        tint = if (hiddenCount > 0) Cm.Cyan else Cm.Text,
+                    )
+                }
+            }
+            // Compte en cours : un appui ramène à la liste des comptes
+            Box(
+                Modifier
+                    .padding(start = 4.dp, end = 6.dp)
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Cm.CyanGlow)
+                    .border(1.dp, Cm.Cyan, RoundedCornerShape(50))
+                    .tvClickable(shape = RoundedCornerShape(50), onClick = onAccounts),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(source.name.take(1).uppercase(), color = Cm.Cyan, fontWeight = FontWeight.Bold)
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Cm.Cyan.copy(alpha = 0.35f)))
+    }
+}
+
+/** Barre du bas, façon maquette : Accueil · TV Live · Films · Séries · Réglages. */
+@Composable
+private fun PhoneBottomBar(model: BrowserModel, onSettings: () -> Unit) {
+    val extra = model.extraPage
+    Column(Modifier.fillMaxWidth().background(Cm.Surface)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Cm.Cyan.copy(alpha = 0.35f)))
+        Row(Modifier.fillMaxWidth().height(62.dp).padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            BottomItem(AppIcons.Home, "Accueil", selected = model.showHome && extra == null) { model.goHome() }
+            model.sections.forEach { s ->
+                val (icon, label) = when (s) {
+                    Section.LIVE -> AppIcons.Tv to "TV Live"
+                    Section.MOVIES -> AppIcons.Movie to "Films"
+                    Section.SERIES -> AppIcons.Library to "Séries"
+                }
+                BottomItem(icon, label, selected = !model.showHome && extra == null && model.section == s) { model.selectSection(s) }
+            }
+            // Ma liste et Historique : déjà là dans chaque rubrique (catégories ★ Favoris et Récents)
+            BottomItem(AppIcons.Settings, "Réglages", selected = false, onClick = onSettings)
+        }
+    }
+}
+
+@Composable
+private fun RowScope.BottomItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        Modifier.weight(1f).fillMaxHeight().padding(vertical = 4.dp).tvClickable(selected = false, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        // pastille cyan derrière l'icône de la rubrique en cours
+        Box(
+            Modifier
+                .size(width = 44.dp, height = 28.dp)
+                .background(if (selected) Cm.CyanGlow else Color.Transparent, RoundedCornerShape(50)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = if (selected) Cm.Cyan else Cm.TextMuted, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            label,
+            color = if (selected) Cm.Cyan else Cm.TextMuted,
+            fontSize = 10.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+        )
     }
 }
 
@@ -209,7 +306,7 @@ private fun SideRail(
                 .padding(horizontal = 10.dp, vertical = 14.dp),
         ) {
             // Logo et heure
-            Row(Modifier.padding(start = 8.dp, bottom = 18.dp), verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.padding(start = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
                 Text("S", color = Cm.Cyan, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                 if (expanded) {
                     Text("oufflyTV", color = Cm.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
@@ -217,16 +314,20 @@ private fun SideRail(
                     Text(clock, style = MonoLabel, color = Cm.TextMuted)
                 }
             }
-            RailItem(AppIcons.Home, "Accueil", expanded, selected = model.showHome) { model.goHome() }
-            model.sections.forEach { s ->
-                val (icon, label) = when (s) {
-                    Section.LIVE -> AppIcons.Tv to "TV en direct"
-                    Section.MOVIES -> AppIcons.Movie to "Films"
-                    Section.SERIES -> AppIcons.Library to "Séries"
+            // Rubriques : défilent si l'écran est trop bas (petite télé, petite fenêtre)
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                val extra = model.extraPage
+                RailItem(AppIcons.Search, "Recherche", expanded, selected = extra == ExtraPage.SEARCH) { model.openExtra(ExtraPage.SEARCH) }
+                RailItem(AppIcons.Home, "Accueil", expanded, selected = model.showHome && extra == null) { model.goHome() }
+                model.sections.forEach { s ->
+                    val (icon, label) = when (s) {
+                        Section.LIVE -> AppIcons.Tv to "TV en direct"
+                        Section.MOVIES -> AppIcons.Movie to "Films"
+                        Section.SERIES -> AppIcons.Library to "Séries"
+                    }
+                    RailItem(icon, label, expanded, selected = !model.showHome && extra == null && s == model.section) { model.selectSection(s) }
                 }
-                RailItem(icon, label, expanded, selected = !model.showHome && s == model.section) { model.selectSection(s) }
             }
-            Spacer(Modifier.weight(1f))
             RailItem(
                 AppIcons.Filter,
                 if (model.hiddenCount > 0) "Filtres (${model.hiddenCount})" else "Filtres",
@@ -270,8 +371,8 @@ private fun RailItem(
     onClick: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 3.dp).tvClickable(selected = selected, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
+        Modifier.fillMaxWidth().padding(vertical = 2.dp).tvClickable(selected = selected, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = label, tint = if (selected) Cm.Cyan else Cm.TextMuted, modifier = Modifier.size(24.dp))
@@ -387,6 +488,13 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
     val hero = if (heroMode) {
         model.heroItem?.takeIf { h -> filtered.any { it.id == h.id } } ?: filtered.first()
     } else null
+    // TV en direct à la télécommande : aperçu vidéo de la chaîne survolée
+    val nowOn = category?.id == NOW_ON
+    val previewMode = wide && model.section == Section.LIVE && !nowOn && remoteNavigation() &&
+        state.settings.value.livePreview && filtered.isNotEmpty() && !model.channelsLoading
+    val previewIndex = if (previewMode) {
+        filtered.indexOfFirst { it.id == model.previewChannel?.id }.takeIf { it >= 0 } ?: 0
+    } else -1
 
     // Rafraîchit l'émission en cours affichée dans la liste
     var clock by remember { mutableLongStateOf(nowMillis()) }
@@ -401,6 +509,9 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
     val heroHeight = (maxHeight * 0.47f).coerceIn(190.dp, 360.dp)
     Column(Modifier.fillMaxSize()) {
         if (hero != null) PosterHero(model, hero, Modifier.fillMaxWidth().height(heroHeight))
+        if (previewIndex >= 0) {
+            LivePreview(state, model, filtered[previewIndex], previewIndex, Modifier.fillMaxWidth().height(heroHeight))
+        }
         Row(
             Modifier.fillMaxWidth().padding(start = 6.dp, end = 12.dp, top = if (hero != null) 2.dp else 8.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -431,7 +542,7 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
                 }
             }
             // Grand écran : la recherche tient sur la ligne du titre
-            if (wide && category != null) {
+            if (wide && category != null && !nowOn) {
                 SearchField(
                     value = model.query,
                     onValueChange = { model.query = it },
@@ -441,7 +552,7 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
             }
         }
 
-        if (!wide && category != null) {
+        if (!wide && category != null && !nowOn) {
             SearchField(
                 value = model.query,
                 onValueChange = { model.query = it },
@@ -455,6 +566,7 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
             category == null -> EmptyHint("Choisis une catégorie")
             model.channelsLoading -> LoadingBox("Chargement de la liste…")
             error != null -> ErrorBox(error, onRetry = model::retry)
+            nowOn -> NowOnPage(state, source, model, filtered, Modifier.fillMaxSize())
             filtered.isEmpty() -> EmptyHint(
                 when {
                     model.query.isNotBlank() -> "Aucun résultat"
@@ -535,6 +647,7 @@ private fun ChannelPane(state: AppState, source: Source, model: BrowserModel, mo
                         favorite = model.isFavorite(channel),
                         now = now,
                         clock = clock,
+                        onFocused = { if (previewMode) model.previewChannel = channel },
                         onClick = { state.openItem(source, filtered, index) },
                         onToggleFavorite = { model.toggleFavorite(channel) },
                     )
@@ -639,6 +752,7 @@ private fun ChannelRow(
     favorite: Boolean,
     now: Programme?,
     clock: Long,
+    onFocused: () -> Unit = {},
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
 ) {
@@ -646,6 +760,7 @@ private fun ChannelRow(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 1.dp)
+            .onFocusChanged { if (it.isFocused) onFocused() }
             .tvClickable(onClick = onClick, onLongClick = onToggleFavorite)
             .padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

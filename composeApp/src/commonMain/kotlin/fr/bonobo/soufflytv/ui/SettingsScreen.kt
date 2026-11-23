@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
@@ -37,6 +38,12 @@ import androidx.compose.foundation.background
 import androidx.compose.material3.Icon
 import androidx.compose.ui.text.font.FontWeight
 import fr.bonobo.soufflytv.AppState
+import fr.bonobo.soufflytv.platform.checkDns
+import fr.bonobo.soufflytv.data.serverHost
+import fr.bonobo.soufflytv.data.DnsMode
+import fr.bonobo.soufflytv.data.DnsCheck
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import fr.bonobo.soufflytv.data.FocusColor
 import fr.bonobo.soufflytv.platform.isAndroid
 import fr.bonobo.soufflytv.platform.isTvBuild
@@ -83,6 +90,13 @@ fun SettingsScreen(state: AppState) {
                     "À l'ouverture, relance directement la dernière chaîne en direct regardée",
                     settings.resumeLastChannel,
                 ) { v -> state.settings.update { it.copy(resumeLastChannel = v) } }
+                if (isAndroid) {
+                    SwitchRow(
+                        "Aperçu des chaînes",
+                        "TV en direct sur grand écran : la chaîne survolée se lance en petit au-dessus de la liste",
+                        settings.livePreview,
+                    ) { v -> state.settings.update { it.copy(livePreview = v) } }
+                }
                 SwitchRow(
                     "Audiodescription",
                     "Une voix décrit l'image, pour les personnes malvoyantes. Désactivée : la piste normale est choisie. Aussi via le bouton AD du lecteur",
@@ -152,6 +166,9 @@ fun SettingsScreen(state: AppState) {
                 ) { v -> state.settings.update { it.copy(hideAdult = v) } }
 
     }
+    val reseau: @Composable () -> Unit = {
+                DnsSection(state)
+    }
     val comptes: @Composable () -> Unit = {
                 AccountsBackupSection(state)
     }
@@ -162,7 +179,7 @@ fun SettingsScreen(state: AppState) {
     }
     val aPropos: @Composable () -> Unit = {
                 Text(
-                    "SoufflyTV 0.8 (${if (isTvBuild) "version TV" else if (isAndroid) "version smartphone" else "version ordinateur"}) — lecteur IPTV libre sous licence GPL v3.\n" +
+                    "SoufflyTV 0.9 (${if (isTvBuild) "version TV" else if (isAndroid) "version smartphone" else "version ordinateur"}) — lecteur IPTV libre sous licence GPL v3.\n" +
                         "Aucune chaîne ni liste n'est fournie : l'application lit uniquement les sources que tu ajoutes.\n" +
                         "Lecture : Media3 (Android), libVLC (ordinateur).",
                     color = Cm.TextMuted,
@@ -174,6 +191,7 @@ fun SettingsScreen(state: AppState) {
     val rubrics = listOf(
         SettingsRubric("Lecture", AppIcons.Play, lecture),
         SettingsRubric("Affichage", AppIcons.Aspect, affichage),
+        SettingsRubric("Réseau", AppIcons.Dns, reseau),
         SettingsRubric("Comptes", AppIcons.Library, comptes),
         SettingsRubric("Données", AppIcons.History, donnees),
         SettingsRubric("À propos", AppIcons.Settings, aPropos),
@@ -267,3 +285,93 @@ private class SettingsRubric(
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val content: @Composable () -> Unit,
 )
+
+/**
+ * Réseau : DNS sécurisé (Cloudflare, Quad9, Google) et test sur les serveurs des comptes enregistrés,
+ * pour voir si la box donne une autre adresse (signe d'un blocage).
+ */
+@Composable
+private fun DnsSection(state: AppState) {
+    val settings = state.settings.value
+    val scope = rememberCoroutineScope()
+    var testing by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf<List<DnsCheck>>(emptyList()) }
+
+    Text("DNS sécurisé", color = Cm.Text, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 14.dp))
+    Text(
+        "Certaines box bloquent des serveurs IPTV par leur DNS. Avec un DNS sécurisé (chiffré), SoufflyTV demande " +
+            "l'adresse des serveurs directement à Cloudflare, Quad9 ou Google : listes, guide TV, affiches et vidéo.",
+        color = Cm.TextMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 14.dp),
+    )
+    Text(
+        "Tu utilises déjà un VPN ou un bloqueur DNS (DNSphere…) ? Il gère le DNS lui-même : laisse « Appareil ».",
+        color = Cm.TextMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp),
+    )
+    Row(Modifier.horizontalScroll(rememberScrollState()).padding(14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        DnsMode.entries.forEach { mode ->
+            Pill(mode.label, selected = settings.dns == mode) {
+                state.settings.update { it.copy(dns = mode) }
+                results = emptyList()
+            }
+        }
+    }
+    Text(
+        settings.dns.detail + if (settings.dns != DnsMode.SYSTEM && !isAndroid) {
+            ". Sur ordinateur, la vidéo passe alors par un petit relais interne à SoufflyTV."
+        } else "",
+        color = Cm.TextMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 14.dp),
+    )
+    Spacer(Modifier.height(10.dp))
+    OutlinedButton(
+        enabled = !testing,
+        onClick = {
+            testing = true
+            results = emptyList()
+            scope.launch {
+                val hosts = state.sources.value.mapNotNull { it.serverHost() }.distinct().take(6)
+                    .ifEmpty { listOf("cloudflare.com") }
+                val mode = state.settings.value.dns
+                results = hosts.map { host ->
+                    runCatching { checkDns(host, mode) }.getOrElse { DnsCheck(host, "erreur", "erreur", false) }
+                }
+                testing = false
+            }
+        },
+        modifier = Modifier.padding(horizontal = 14.dp),
+    ) {
+        Text(if (testing) "Test en cours…" else "Tester avec mes comptes")
+    }
+    val secureName = if (settings.dns == DnsMode.SYSTEM) DnsMode.CLOUDFLARE.label else settings.dns.label
+    results.forEach { check ->
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
+            Text(check.host, color = Cm.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text("Box / appareil : ${check.system}", color = Cm.TextMuted, fontSize = 12.sp)
+            Text("$secureName : ${check.secure}", color = Cm.TextMuted, fontSize = 12.sp)
+            when {
+                check.secure == "injoignable" || check.secure.startsWith("erreur") ->
+                    Text(
+                        "Le DNS sécurisé ne répond pas sur ce réseau : un VPN ou un bloqueur DNS (DNSphere…) le bloque sans doute. " +
+                            "SoufflyTV utilise alors celui de l'appareil ; dans ce cas, laisse « Appareil ».",
+                        color = Cm.TextMuted,
+                        fontSize = 12.sp,
+                    )
+                check.system == "introuvable" && check.secure != "introuvable" ->
+                    Text("⚠ Introuvable avec le DNS de la box : probablement bloqué. Le DNS sécurisé règle le problème.", color = Cm.Error, fontSize = 12.sp)
+                check.differs ->
+                    Text(
+                        "⚠ Adresses différentes : la box redirige peut-être ce serveur (blocage). " +
+                            "Si les chaînes ne se lancent pas, active le DNS sécurisé.",
+                        color = Cm.Error,
+                        fontSize = 12.sp,
+                    )
+                else -> Text("✓ Même réponse : pas de blocage par le DNS.", color = Cm.Success, fontSize = 12.sp)
+            }
+        }
+    }
+}

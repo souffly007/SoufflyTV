@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -53,6 +54,7 @@ import fr.bonobo.soufflytv.data.movieMetaLine
 import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.ItemType
 import fr.bonobo.soufflytv.model.MovieInfo
+import fr.bonobo.soufflytv.model.Section
 import fr.bonobo.soufflytv.model.Source
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.MonoLabel
@@ -64,7 +66,7 @@ import kotlinx.coroutines.CancellationException
  * Nouvelles séries, Films les mieux notés et Ma liste (favoris).
  */
 @Composable
-fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Modifier) {
+fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Modifier, compact: Boolean = false) {
     LaunchedEffect(model) { model.loadHome() }
 
     val library = state.library
@@ -113,8 +115,17 @@ fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Mod
             Modifier.focusRequester(cardFocus).onFocusChanged { cardFocused = it.isFocused }
         } else Modifier
 
+    val posterWidth = if (compact) 112.dp else 132.dp
     Column(modifier.verticalScroll(rememberScrollState())) {
-        if (featured != null) {
+        if (compact) {
+            // Smartphone : carrousel « À la une » (le film en cours puis les nouveautés)
+            val featuredList = (listOfNotNull(featured) + model.homeNewMovies.take(5)).distinctBy { it.id }
+            if (featuredList.isNotEmpty()) {
+                PhoneFeaturedCarousel(state, source, model, featuredList)
+            } else if (model.homeLoading) {
+                Box(Modifier.fillMaxWidth().height(240.dp)) { LoadingBox("Chargement de l'accueil…") }
+            }
+        } else if (featured != null) {
             FeaturedBanner(
                 state = state,
                 source = source,
@@ -136,36 +147,63 @@ fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Mod
         }
 
         if (continueItems.isNotEmpty()) {
-            HomeRow("Continuer à regarder") {
-                continueItems.forEachIndexed { i, item ->
-                    ContinueCard(
-                        item,
-                        progress = library.progress("${source.id}|${item.id}"),
-                        position = library.position("${source.id}|${item.id}"),
-                        modifier = cardModifier("continue", item),
-                    ) {
-                        // reprise directe, là où l'on s'était arrêté
-                        model.homeReturnKey = "continue|${item.id}"
-                        state.play(source, continueItems, i)
+            if (compact) {
+                // Smartphone : une grande carte pour le dernier film ou épisode commencé
+                val item = continueItems.first()
+                PhoneContinueCard(
+                    item,
+                    progress = library.progress("${source.id}|${item.id}"),
+                    position = library.position("${source.id}|${item.id}"),
+                    onSeeAll = { model.openExtra(ExtraPage.HISTORY) },
+                    onContinue = { state.play(source, continueItems, 0) },
+                    onRestart = {
+                        library.setPosition("${source.id}|${item.id}", 0)
+                        state.play(source, continueItems, 0)
+                    },
+                )
+            } else {
+                HomeRow("Continuer à regarder") {
+                    continueItems.forEachIndexed { i, item ->
+                        ContinueCard(
+                            item,
+                            progress = library.progress("${source.id}|${item.id}"),
+                            position = library.position("${source.id}|${item.id}"),
+                            modifier = cardModifier("continue", item),
+                        ) {
+                            // reprise directe, là où l'on s'était arrêté
+                            model.homeReturnKey = "continue|${item.id}"
+                            state.play(source, continueItems, i)
+                        }
                     }
                 }
             }
         }
         if (liveRecents.isNotEmpty()) {
-            HomeRow("Chaînes récentes") {
+            HomeRow("Chaînes récentes", onSeeAll = if (Section.LIVE in model.sections) ({ model.selectSection(Section.LIVE) }) else null) {
                 liveRecents.forEachIndexed { i, item ->
                     LiveCard(item, cardModifier("live", item)) { open("live", liveRecents, i) }
                 }
             }
         }
-        PosterRow("Nouveaux films", "movies", model.homeNewMovies, state, model, ::cardModifier, ::open)
-        PosterRow("Nouvelles séries", "series", model.homeNewSeries, state, model, ::cardModifier, ::open)
-        PosterRow("Films les mieux notés", "top", model.homeTopMovies, state, model, ::cardModifier, ::open)
-        PosterRow("Ma liste", "mylist", myList, state, model, ::cardModifier, ::open)
+        PosterRow(if (compact) "Films" else "Nouveaux films", "movies", model.homeNewMovies, state, model, ::cardModifier, ::open, posterWidth) {
+            model.selectSection(Section.MOVIES)
+        }
+        PosterRow(if (compact) "Séries" else "Nouvelles séries", "series", model.homeNewSeries, state, model, ::cardModifier, ::open, posterWidth) {
+            model.selectSection(Section.SERIES)
+        }
+        PosterRow("Films les mieux notés", "top", model.homeTopMovies, state, model, ::cardModifier, ::open, posterWidth) {
+            model.selectSection(Section.MOVIES)
+        }
+        PosterRow("Ma liste", "mylist", myList, state, model, ::cardModifier, ::open, posterWidth) {
+            model.openExtra(ExtraPage.MY_LIST)
+        }
 
         if (featured == null && !model.homeLoading && continueItems.isEmpty() && liveRecents.isEmpty()) {
             Box(Modifier.fillMaxWidth().height(260.dp)) {
-                EmptyHint("Choisis TV en direct, Films ou Séries dans la barre de gauche.")
+                EmptyHint(
+                    if (compact) "Choisis TV Live, Films ou Séries dans la barre du bas."
+                    else "Choisis TV en direct, Films ou Séries dans la barre de gauche.",
+                )
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -285,12 +323,21 @@ private fun FeaturedBanner(
 
 /** Titre de rangée (« ▌Continuer à regarder ») et cartes qui défilent horizontalement. */
 @Composable
-private fun HomeRow(title: String, content: @Composable () -> Unit) {
+internal fun HomeRow(title: String, onSeeAll: (() -> Unit)? = null, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
-        Row(Modifier.padding(start = 24.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(4.dp).height(18.dp).background(Cm.Cyan, RoundedCornerShape(2.dp)))
             Spacer(Modifier.width(10.dp))
-            Text(title, color = Cm.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = Cm.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            if (onSeeAll != null) {
+                Text(
+                    "Tout voir ›",
+                    color = Cm.Cyan,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.tvClickable(onClick = onSeeAll).padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
         }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -310,11 +357,13 @@ private fun PosterRow(
     model: BrowserModel,
     cardModifier: (String, Channel) -> Modifier,
     open: (String, List<Channel>, Int) -> Unit,
+    posterWidth: Dp = 132.dp,
+    onSeeAll: (() -> Unit)? = null,
 ) {
     if (items.isEmpty()) return
-    HomeRow(title) {
+    HomeRow(title, onSeeAll) {
         items.forEachIndexed { i, item ->
-            Box(Modifier.width(132.dp)) {
+            Box(Modifier.width(posterWidth)) {
                 PosterCard(
                     item,
                     favorite = model.isFavorite(item),
@@ -359,7 +408,7 @@ private fun ContinueCard(item: Channel, progress: Float?, position: Long?, modif
 
 /** Carte de chaîne récente : logo et nom. */
 @Composable
-private fun LiveCard(item: Channel, modifier: Modifier, onClick: () -> Unit) {
+internal fun LiveCard(item: Channel, modifier: Modifier, onClick: () -> Unit) {
     Column(
         Modifier.width(150.dp).padding(4.dp).then(modifier).tvClickable(onClick = onClick).padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.network.ktor3.KtorNetworkFetcherFactory
+import fr.bonobo.soufflytv.data.createHttpClient
 import fr.bonobo.soufflytv.ui.AddSourceScreen
 import fr.bonobo.soufflytv.ui.BrowserScreen
 import fr.bonobo.soufflytv.ui.ManageCategoriesScreen
@@ -17,11 +21,19 @@ import fr.bonobo.soufflytv.ui.SeriesScreen
 import fr.bonobo.soufflytv.ui.SettingsScreen
 import fr.bonobo.soufflytv.ui.SourcesScreen
 import androidx.compose.ui.graphics.Color
+import coil3.serviceLoaderEnabled
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.SoufflyTheme
 
 @Composable
 fun App(state: AppState) {
+    // Affiches et logos : même client HTTP que le reste (DNS sécurisé compris)
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .serviceLoaderEnabled(false)
+            .components { add(KtorNetworkFetcherFactory(httpClient = { createHttpClient() })) }
+            .build()
+    }
     SoufflyTheme(focusColor = Color(state.settings.value.focusColor.argb)) {
         Surface(Modifier.fillMaxSize(), color = Cm.Background) {
             when (val screen = state.screen) {

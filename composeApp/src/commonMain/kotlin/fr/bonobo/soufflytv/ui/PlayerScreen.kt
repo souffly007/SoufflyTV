@@ -77,6 +77,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.draw.clip
 import fr.bonobo.soufflytv.AppState
 import fr.bonobo.soufflytv.Screen
 import fr.bonobo.soufflytv.data.formatDuration
@@ -603,6 +605,22 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
                                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
                                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
                         )
+                        // Films et séries : gros boutons ronds au centre de l'image (−10 s, pause, +10 s)
+                        if (!live && status == PlayerStatus.Playing) {
+                            CenterControls(
+                                controller,
+                                Modifier.align(Alignment.Center),
+                                onSeek = { back ->
+                                    controller.seekBy(if (back) -SEEK_STEP_MS else SEEK_STEP_MS)
+                                    toast = if (back) "− 10 s" else "+ 10 s"
+                                    interaction++
+                                },
+                                onToggle = {
+                                    controller.togglePause()
+                                    interaction++
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -1140,6 +1158,51 @@ private fun ZapBanner(channel: Channel, index: Int, current: Programme?) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+    }
+}
+
+/** Gros boutons ronds au centre de la vidéo (Android) : −10 s, lecture / pause, +10 s. */
+@Composable
+private fun CenterControls(
+    controller: PlayerController,
+    modifier: Modifier,
+    onSeek: (back: Boolean) -> Unit,
+    onToggle: () -> Unit,
+) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(44.dp), verticalAlignment = Alignment.CenterVertically) {
+        RoundControl(AppIcons.Rewind, "10 s", "Reculer de 10 secondes", size = 64.dp) { onSeek(true) }
+        RoundControl(
+            if (controller.isPlaying) AppIcons.Pause else AppIcons.Play,
+            null,
+            if (controller.isPlaying) "Pause" else "Lecture",
+            size = 88.dp,
+            onClick = onToggle,
+        )
+        RoundControl(AppIcons.Forward, "10 s", "Avancer de 10 secondes", size = 64.dp) { onSeek(false) }
+    }
+}
+
+@Composable
+private fun RoundControl(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    caption: String?,
+    description: String,
+    size: Dp,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.5f))
+            .border(2.dp, Color.White.copy(alpha = 0.75f), CircleShape)
+            .tvClickable(shape = CircleShape, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(size * 0.42f))
+            if (caption != null) Text(caption, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

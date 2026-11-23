@@ -1,6 +1,7 @@
 package fr.bonobo.soufflytv.data
 
 import fr.bonobo.soufflytv.model.Source
+import fr.bonobo.soufflytv.platform.platformHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
@@ -22,7 +23,7 @@ const val MAG_USER_AGENT =
 /** Erreur « métier » dont le message peut être montré tel quel à l'utilisateur. */
 class IptvException(message: String) : Exception(message)
 
-fun createHttpClient(): HttpClient = HttpClient {
+fun createHttpClient(): HttpClient = platformHttpClient {
     install(HttpTimeout) {
         connectTimeoutMillis = 15_000
         socketTimeoutMillis = 60_000
@@ -206,3 +207,10 @@ fun trailerUrl(raw: String?): String? {
         else -> null
     }
 }
+
+/** Nom du serveur d'une source (pour tester le DNS). */
+fun Source.serverHost(): String? = when (this) {
+    is Source.M3u -> url.takeIf { it.isNotBlank() }?.let(::hostOf)
+    is Source.Xtream -> hostOf(server)
+    is Source.Stalker -> hostOf(portal)
+}?.takeIf { it.isNotBlank() }

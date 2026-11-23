@@ -27,8 +27,19 @@ import kotlinx.coroutines.launch
 const val ALL_CATEGORIES = "__all__"
 /** Nombre de cartes par rangée de l'accueil. */
 private const val HOME_ROW = 24
+private const val SEARCH_LIMIT = 40
 const val FAVORITES = "__fav__"
 const val RECENTS = "__recent__"
+/** TV en direct : « En ce moment », les émissions en cours rangées par groupe (avec un guide TV). */
+const val NOW_ON = "__now__"
+
+/** Pages en plus des rubriques : Ma liste, Historique, Recherche. */
+enum class ExtraPage { MY_LIST, HISTORY, SEARCH }
+
+/** Résultats d'une recherche dans tout le compte. */
+data class SearchResults(val live: List<Channel>, val movies: List<Channel>, val series: List<Channel>) {
+    val isEmpty: Boolean get() = live.isEmpty() && movies.isEmpty() && series.isEmpty()
+}
 
 fun isSpecialCategory(id: String) = id == FAVORITES || id == RECENTS || id == ALL_CATEGORIES
 
@@ -100,7 +111,37 @@ class BrowserModel(
     var contentFocusToken by mutableIntStateOf(0)
         private set
 
+    /** Page en plus affichée (Ma liste, Historique, Recherche), ou null. */
+    var extraPage by mutableStateOf<ExtraPage?>(null)
+        private set
+
+    fun openExtra(page: ExtraPage) {
+        extraPage = page
+        contentFocusToken++
+    }
+
+    /** Recherche : texte tapé et derniers résultats, gardés au retour d'une fiche ou du lecteur. */
+    var searchText by mutableStateOf("")
+    var searchResults by mutableStateOf<SearchResults?>(null)
+
+    /** TV en direct, grand écran : chaîne présentée (et lue en petit) dans l'aperçu au-dessus de la liste. */
+    var previewChannel by mutableStateOf<Channel?>(null)
+
+    /** Recherche dans les chaînes, films et séries du compte (catégories masquées et adultes exclues). */
+    suspend fun search(text: String): SearchResults {
+        val q = text.trim()
+        if (q.length < 2) return SearchResults(emptyList(), emptyList(), emptyList())
+        val all = Category(ALL_CATEGORIES, "")
+        suspend fun find(target: Section): List<Channel> =
+            if (target !in sections) emptyList()
+            else (safely { channelsFor(target, all) } ?: emptyList())
+                .filter { it.name.contains(q, ignoreCase = true) }
+                .take(SEARCH_LIMIT)
+        return SearchResults(find(Section.LIVE), find(Section.MOVIES), find(Section.SERIES))
+    }
+
     fun goHome() {
+        extraPage = null
         showHome = true
         homeReturnKey = null
         returnFocusId = null
@@ -193,10 +234,11 @@ class BrowserModel(
             val list = providerCategories.filterNot {
                 (settings.value.hideAdult && it.id in adultIds) || it.id in hiddenIds
             }
-            return listOf(Category(FAVORITES, "Favoris"), Category(RECENTS, "Récents"), Category(ALL_CATEGORIES, all)) + list
+            val nowOn = if (section == Section.LIVE && provider.hasLocalEpg) listOf(Category(NOW_ON, "En ce moment")) else emptyList()
+            return nowOn + listOf(Category(FAVORITES, "Favoris"), Category(RECENTS, "Récents"), Category(ALL_CATEGORIES, all)) + list
         }
 
-    val providerCategoryCount: Int get() = categories.size - 3
+    val providerCategoryCount: Int get() = categories.count { it.id !in setOf(NOW_ON, FAVORITES, RECENTS, ALL_CATEGORIES) }
 
     /** Nombre de catégories masquées par l'utilisateur dans la rubrique affichée. */
     val hiddenCount: Int get() = library.hiddenIds(sourceId, section).size
@@ -215,6 +257,7 @@ class BrowserModel(
 
     fun selectSection(target: Section) {
         showHome = false
+        extraPage = null
         // Rubrique choisie dans la barre : le focus va sur sa catégorie, pas sur une affiche ouverte avant
         returnFocusId = null
         contentFocusToken++
@@ -260,7 +303,8 @@ class BrowserModel(
             channels = emptyList()
             error = null
             try {
-                channels = provider.channels(section, category.id.takeUnless { it == ALL_CATEGORIES })
+                // « En ce moment » s'appuie sur toutes les chaînes, regroupées ensuite par groupe
+                channels = provider.channels(section, category.id.takeUnless { it == ALL_CATEGORIES || it == NOW_ON })
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -273,12 +317,17 @@ class BrowserModel(
 
     /** Retour système en écran étroit : revenir aux catégories avant de quitter la source. */
     fun consumeBack(): Boolean {
-        if (!wide && showChannels) {
+        // Ma liste, Historique, Recherche : retour à l'accueil
+        if (extraPage != null) {
+            goHome()
+            return true
+        }
+        if (!wide && showChannels && !showHome) {
             showChannels = false
             return true
         }
-        // Grand écran : Retour depuis TV / Films / Séries ramène à l'accueil de contenus
-        if (wide && !showHome) {
+        // Retour depuis TV / Films / Séries : accueil de contenus
+        if (!showHome) {
             goHome()
             return true
         }

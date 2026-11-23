@@ -81,3 +81,12 @@ expect fun secureRandomBytes(size: Int): ByteArray
 
 /** Touches dédiées CH+ / CH- de la télécommande : +1, -1, sinon 0. */
 expect fun KeyEvent.channelKeyDelta(): Int
+
+/** Client HTTP de l'application (moteur OkHttp, avec le DNS choisi dans les réglages). */
+expect fun platformHttpClient(block: io.ktor.client.HttpClientConfig<*>.() -> Unit): io.ktor.client.HttpClient
+
+/** Change le DNS utilisé par toutes les connexions (listes, guide, images, vidéo). */
+expect fun applyDnsMode(mode: fr.bonobo.soufflytv.data.DnsMode)
+
+/** Compare l'adresse de [host] donnée par le DNS de l'appareil et par [mode]. */
+expect suspend fun checkDns(host: String, mode: fr.bonobo.soufflytv.data.DnsMode): fr.bonobo.soufflytv.data.DnsCheck

@@ -26,6 +26,11 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import fr.bonobo.soufflytv.data.DnsMode
+import fr.bonobo.soufflytv.platform.SecureDns
+import java.util.concurrent.TimeUnit
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -171,12 +176,25 @@ actual fun VideoPlayer(
 
 @OptIn(UnstableApi::class)
 private fun buildPlayer(context: Context, request: StreamRequest, options: PlayerOptions): ExoPlayer {
-    val http = DefaultHttpDataSource.Factory()
-        .setUserAgent(request.headers["User-Agent"] ?: DEFAULT_USER_AGENT)
-        .setDefaultRequestProperties(request.headers - "User-Agent")
-        .setAllowCrossProtocolRedirects(true)
-        .setConnectTimeoutMs(15_000)
-        .setReadTimeoutMs(30_000)
+    val userAgent = request.headers["User-Agent"] ?: DEFAULT_USER_AGENT
+    val http: DataSource.Factory = if (SecureDns.mode != DnsMode.SYSTEM) {
+        // DNS sécurisé : la vidéo passe par OkHttp, avec le DNS chiffré choisi dans les réglages
+        OkHttpDataSource.Factory(
+            SecureDns.client.newBuilder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+        )
+            .setUserAgent(userAgent)
+            .setDefaultRequestProperties(request.headers - "User-Agent")
+    } else {
+        DefaultHttpDataSource.Factory()
+            .setUserAgent(userAgent)
+            .setDefaultRequestProperties(request.headers - "User-Agent")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(30_000)
+    }
 
     // minBuffer, maxBuffer, tampon avant lecture, tampon après coupure (ms)
     val (minMs, maxMs, startMs, rebufferMs) = when (options.buffer) {

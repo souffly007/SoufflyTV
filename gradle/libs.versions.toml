@@ -15,6 +15,8 @@ media3 = "1.6.1"
 # Décodeur FFmpeg pour Media3 (Jellyfin, GPL v3) : même numéro que Media3 + révision
 media3-ffmpeg = "1.6.1+1"
 vlcj = "4.8.3"
+# Même version que celle tirée par Ktor (moteur OkHttp)
+okhttp = "4.12.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -33,6 +35,10 @@ media3-exoplayer-hls = { module = "androidx.media3:media3-exoplayer-hls", versio
 media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
 media3-ffmpeg-decoder = { module = "org.jellyfin.media3:media3-ffmpeg-decoder", version.ref = "media3-ffmpeg" }
 vlcj = { module = "uk.co.caprica:vlcj", version.ref = "vlcj" }
+# DNS chiffré (DNS-over-HTTPS : Cloudflare, Quad9, Google), Apache 2.0
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-dnsoverhttps = { module = "com.squareup.okhttp3:okhttp-dnsoverhttps", version.ref = "okhttp" }
+media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

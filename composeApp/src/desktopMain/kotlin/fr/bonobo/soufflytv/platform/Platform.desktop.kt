@@ -8,25 +8,17 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.key
-import fr.bonobo.soufflytv.data.IptvException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.awt.FileDialog
 import java.awt.Frame
-import java.io.BufferedInputStream
 import java.io.File
-import java.io.InputStream
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.zip.GZIPInputStream
 
 actual val isAndroid: Boolean = false
 actual val isTvBuild: Boolean = false
@@ -88,54 +80,7 @@ actual suspend fun writeSecureFile(name: String, content: String) = withContext(
 }
 
 actual suspend fun streamText(url: String, headers: Map<String, String>, onChunk: (String) -> Unit) =
-    withContext(Dispatchers.IO) {
-        var current = url
-        var connection: HttpURLConnection? = null
-        try {
-            for (hop in 0 until 6) {
-                val c = (URL(current).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 15_000
-                    readTimeout = 60_000
-                    instanceFollowRedirects = false
-                    setRequestProperty("Accept-Encoding", "gzip")
-                    headers.forEach { (k, v) -> setRequestProperty(k, v) }
-                }
-                val code = c.responseCode
-                if (code in 300..399) {
-                    val location = c.getHeaderField("Location")
-                    c.disconnect()
-                    if (location.isNullOrBlank()) throw IptvException("Guide TV : redirection invalide")
-                    current = URL(URL(current), location).toString()
-                    continue
-                }
-                if (code !in 200..299) {
-                    c.disconnect()
-                    throw IptvException("Guide TV : erreur HTTP $code")
-                }
-                connection = c
-                break
-            }
-            val c = connection ?: throw IptvException("Guide TV : trop de redirections")
-            var input: InputStream = BufferedInputStream(c.inputStream, 64 * 1024)
-            input.mark(4)
-            val b1 = input.read()
-            val b2 = input.read()
-            input.reset()
-            if (b1 == 0x1f && b2 == 0x8b) input = GZIPInputStream(input, 64 * 1024)
-            InputStreamReader(input, Charsets.UTF_8).use { reader ->
-                val buffer = CharArray(32 * 1024)
-                while (true) {
-                    ensureActive()
-                    val n = reader.read(buffer)
-                    if (n < 0) break
-                    onChunk(String(buffer, 0, n))
-                }
-            }
-        } finally {
-            connection?.disconnect()
-        }
-        Unit
-    }
+    streamTextJvm(url, headers, onChunk)
 
 /** Pavé numérique + / − (le + et le − du clavier principal passent par le caractère tapé). */
 actual fun KeyEvent.channelKeyDelta(): Int = when (key) {

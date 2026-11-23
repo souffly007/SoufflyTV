@@ -1,5 +1,8 @@
 package fr.bonobo.soufflytv.player
 
+import fr.bonobo.soufflytv.data.DnsMode
+import fr.bonobo.soufflytv.platform.SecureDns
+import fr.bonobo.soufflytv.platform.StreamProxy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
@@ -228,7 +231,9 @@ actual fun VideoPlayer(
             request.headers["Referer"]?.let { add(":http-referrer=$it") }
             add(":network-caching=$caching")
         }
-        vlc.player.media().play(request.url, *mediaOptions.toTypedArray())
+        // DNS sécurisé : VLC passe par le relais local, qui joint le serveur avec le DNS chiffré
+        val url = if (SecureDns.mode != DnsMode.SYSTEM) StreamProxy.wrap(request.url, request.headers) else request.url
+        vlc.player.media().play(url, *mediaOptions.toTypedArray())
     }
 
     // Position, durée, pistes et format d'image
