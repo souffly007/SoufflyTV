@@ -36,10 +36,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -542,54 +538,4 @@ fun KeepFocus(
             delay(60)
         }
     }
-}
-
-/**
- * Télécommande : OK maintenu une demi-seconde (ou la touche Menu) = appui long, OK bref = appui simple.
- * Les télécommandes Android TV n'envoient pas toujours l'appui long au bouton lui-même :
- * on le mesure ici, avant lui. Au doigt et à la souris, rien ne change (le bouton gère l'appui long).
- */
-@Composable
-fun Modifier.okLongPress(onClick: () -> Unit, onLongClick: () -> Unit): Modifier {
-    val scope = rememberCoroutineScope()
-    val currentClick by rememberUpdatedState(onClick)
-    val currentLong by rememberUpdatedState(onLongClick)
-    val press = remember { OkPress() }
-    return onPreviewKeyEvent { event ->
-        if (event.key == Key.Menu) {
-            if (event.type == KeyEventType.KeyUp) currentLong()
-            return@onPreviewKeyEvent true
-        }
-        val ok = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
-        if (!ok) return@onPreviewKeyEvent false
-        when (event.type) {
-            KeyEventType.KeyDown -> {
-                // les télécommandes répètent KeyDown tant que la touche est tenue : on ne compte que le premier
-                if (!press.down) {
-                    press.down = true
-                    press.longDone = false
-                    press.job = scope.launch {
-                        delay(550)
-                        press.longDone = true
-                        currentLong()
-                    }
-                }
-                true
-            }
-            KeyEventType.KeyUp -> {
-                press.job?.cancel()
-                val wasDown = press.down
-                press.down = false
-                if (wasDown && !press.longDone) currentClick()
-                true
-            }
-            else -> false
-        }
-    }
-}
-
-private class OkPress {
-    var down = false
-    var longDone = false
-    var job: Job? = null
 }

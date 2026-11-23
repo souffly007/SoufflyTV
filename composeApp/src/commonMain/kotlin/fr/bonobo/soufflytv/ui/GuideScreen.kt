@@ -1,6 +1,8 @@
 package fr.bonobo.soufflytv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -147,6 +149,13 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
     fun play(group: ChannelGroup, programme: Programme?) {
         val index = model.guideGroups.indexOf(group).coerceAtLeast(0)
         val now = nowMillis()
+        // Émission à venir, ou terminée et revoyable : menu (rappel, replay, qualité)
+        if (programme != null && (programme.start > now ||
+                (programme.stop <= now && group.variants.any { isReplayable(it.channel, programme, now) }))
+        ) {
+            actions = group to programme
+            return
+        }
         if (programme != null && programme.stop <= now) {
             val archived = group.variants.filter { isReplayable(it.channel, programme, now) }
             if (archived.size > 1) {
@@ -255,10 +264,15 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
             group = group,
             programme = programme,
             onDismiss = { actions = null },
-            onWatch = { asReplay ->
+            onLive = { variant ->
                 actions = null
-                // direct : la chaîne en ce moment ; replay : l'émission depuis le début
-                play(group, if (asReplay) programme else null)
+                state.settings.update { it.copy(preferredQuality = variant.quality) }
+                startGuidePlayback(state, source, model, variant, model.guideGroups.indexOf(group).coerceAtLeast(0))
+            },
+            onReplay = { variant ->
+                actions = null
+                state.settings.update { it.copy(preferredQuality = variant.quality) }
+                state.play(source, listOf(variant.channel.replayOf(programme)), 0)
             },
         )
     }
@@ -643,6 +657,11 @@ private fun GuideRow(
                                 }
                             }
                             .onPreviewKeyEvent { event ->
+                                // touche Menu de la télécommande : menu de l'émission (sur le relâchement)
+                                if (event.key == Key.Menu) {
+                                    if (event.type == KeyEventType.KeyUp) onLongPress(p)
+                                    return@onPreviewKeyEvent true
+                                }
                                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                                 when (event.key) {
                                     // ◀ ▶ : émission précédente / suivante de la même chaîne (même hors de l'écran)
@@ -722,8 +741,6 @@ private fun ProgrammeCell(
                 shape,
             )
             .then(if (selected) Modifier.border(2.dp, Cm.Cyan, shape) else Modifier)
-            // OK maintenu (télécommande) ou touche Menu : menu de l'émission ; OK bref : lecture
-            .okLongPress(onClick = onClick, onLongClick = onLongClick)
             .tvClickable(shape = shape, onLongClick = onLongClick, onClick = onClick),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -821,7 +838,7 @@ internal fun QualityChooser(
     }
 }
 
-// ---------- Appui long : que faire de cette émission ? ----------
+// ---------- Menu d'une émission : rappel, replay, qualité ----------
 
 @Composable
 private fun ProgrammeActions(
@@ -830,15 +847,14 @@ private fun ProgrammeActions(
     group: ChannelGroup,
     programme: Programme,
     onDismiss: () -> Unit,
-    /** true = replay de l'émission, false = la chaîne en direct. */
-    onWatch: (asReplay: Boolean) -> Unit,
+    onLive: (ChannelVariant) -> Unit,
+    onReplay: (ChannelVariant) -> Unit,
 ) {
     val now = nowMillis()
     val future = programme.start > now
-    val ended = programme.stop <= now
-    val canReplay = ended && group.variants.any { isReplayable(it.channel, programme, now) }
-    val ids = group.variants.map { it.channel.id }
-    val reminder = state.reminders.find(source.id, ids, programme.start)
+    val archived = if (programme.stop <= now) group.variants.filter { isReplayable(it.channel, programme, now) } else emptyList()
+    val preferred = state.settings.value.preferredQuality.ifEmpty { null }
+    val reminder = state.reminders.find(source.id, group.variants.map { it.channel.id }, programme.start)
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         repeat(10) {
@@ -848,27 +864,46 @@ private fun ProgrammeActions(
     }
 
     @Composable
-    fun Action(text: String, focus: Boolean = false, onClick: () -> Unit) {
+    fun Action(text: String, focus: Boolean = false, accent: Boolean = false, onClick: () -> Unit) {
         Text(
             text,
-            color = Cm.Text,
+            color = if (accent) Cm.Cyan else Cm.Text,
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 3.dp)
+                .padding(vertical = 2.dp)
                 .then(if (focus) Modifier.focusRequester(first) else Modifier)
                 .tvClickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 9.dp),
         )
+    }
+
+    @Composable
+    fun Label(text: String) {
+        Text(text, style = MonoLabel, color = Cm.TextMuted, modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 2.dp))
+    }
+
+    /** Une ligne par qualité (SD, HD, FHD…), la dernière choisie en cyan ; le focus va dessus si [focus]. */
+    @Composable
+    fun Qualities(variants: List<ChannelVariant>, icon: String, focus: Boolean, onChoose: (ChannelVariant) -> Unit) {
+        val start = ChannelGroup(group.key, group.name, variants).variantFor(preferred)
+        variants.forEach { v ->
+            val isStart = v == start
+            Action("$icon  ${v.quality}", focus = focus && isStart, accent = isStart) { onChoose(v) }
+        }
     }
 
     AppDialog(onDismissRequest = onDismiss) {
         Column(
             Modifier
-                .width(420.dp)
+                .width(440.dp)
                 .background(Cm.Surface, RoundedCornerShape(16.dp))
                 .border(1.dp, Cm.Cyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                // beaucoup de versions (SD, HD, FHD, 4K…) : le menu défile sur un petit écran
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -880,12 +915,12 @@ private fun ProgrammeActions(
                     Text(programmeTiming(programme, now), color = Cm.TextMuted, fontSize = 13.sp, maxLines = 1)
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(8.dp))
             when {
                 future -> {
                     if (reminder == null) {
-                        Action("⏰  Me rappeler à ${formatClock(programme.start)}", focus = true) {
-                            val variant = group.variantFor(state.settings.value.preferredQuality.ifEmpty { null })
+                        Action("⏰  Me rappeler à ${formatClock(programme.start)}", focus = true, accent = true) {
+                            val variant = group.variantFor(preferred)
                             state.reminders.add(
                                 Reminder(source.id, variant.channel, group.name, programme.title, programme.start, programme.stop)
                             )
@@ -897,18 +932,24 @@ private fun ProgrammeActions(
                             onDismiss()
                         }
                     }
-                    Action("▶  Basculer sur la chaîne maintenant") { onWatch(false) }
+                    Label("BASCULER SUR LA CHAÎNE MAINTENANT")
+                    Qualities(group.variants, "▶", focus = false, onChoose = onLive)
                 }
-                canReplay -> {
-                    Action("⟲  Revoir cette émission (replay)", focus = true) { onWatch(true) }
-                    Action("▶  Regarder la chaîne en direct") { onWatch(false) }
+                archived.isNotEmpty() -> {
+                    Label("REVOIR L'ÉMISSION (REPLAY)")
+                    Qualities(archived, "⟲", focus = true, onChoose = onReplay)
+                    Label("OU LA CHAÎNE EN DIRECT")
+                    Qualities(group.variants, "▶", focus = false, onChoose = onLive)
                 }
-                else -> Action("▶  Regarder la chaîne", focus = true) { onWatch(false) }
+                else -> {
+                    Label("REGARDER LA CHAÎNE")
+                    Qualities(group.variants, "▶", focus = true, onChoose = onLive)
+                }
             }
             Text(
                 "Enregistrer sur le NAS : bientôt",
                 color = Cm.TextMuted,
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             )
             Action("Fermer", onClick = onDismiss)

@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.9.7 && git push origin v0.9.7
+git tag v0.9.8 && git push origin v0.9.8
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -195,7 +195,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 **Affiches** : liens d'images Xtream acceptés sous toutes leurs formes (//…, /t/p/… TMDB, chemin du serveur) ; si l'affiche de la liste manque, celle de la fiche du film la remplace
 
 **Rappels**
-- [x] Appui long sur une émission du guide TV (OK maintenu ou touche Menu de la télécommande) : « Me rappeler à 16:00 », « Basculer sur la chaîne », ou « Revoir » (replay) pour une émission terminée
+- [x] OK sur une émission à venir ou revoyable (ou appui long / touche Menu sur n'importe laquelle) : un seul menu avec le rappel, le replay et le choix de la qualité — « Me rappeler à 16:00 », « Basculer sur la chaîne », ou « Revoir » (replay) pour une émission terminée
 - [x] ⏰ sur les émissions avec rappel ; à l'heure, bandeau « Ça commence » par-dessus l'écran (même pendant une autre chaîne) avec « Regarder » / « Ignorer »
 - [x] Android : notification 2 minutes avant, même appli fermée (autorisation demandée au premier rappel)
 
