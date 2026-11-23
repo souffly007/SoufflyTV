@@ -31,6 +31,12 @@ expect fun formatClock(epochMillis: Long): String
 /** Jour (heure locale) : « Aujourd'hui », « Demain », « Hier », sinon « mercredi 25 ». */
 expect fun formatDay(epochMillis: Long): String
 
+/**
+ * Date et heure dans un fuseau donné (replay : l'heure de début se donne dans le fuseau du serveur).
+ * [pattern] au format java.time (« yyyy-MM-dd:HH-mm ») ; [zoneId] null ou inconnu = fuseau de l'appareil.
+ */
+expect fun formatZoned(epochMillis: Long, zoneId: String?, pattern: String): String
+
 expect val isAndroid: Boolean
 
 /** APK « tv » : interface toujours en grand écran, pas de rotation ni d'image dans l'image. */

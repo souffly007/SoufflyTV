@@ -68,6 +68,7 @@ fun ExtraPageContent(state: AppState, source: Source, model: BrowserModel, page:
         ExtraPage.HISTORY -> HistoryPage(state, source, model, modifier)
         ExtraPage.SEARCH -> SearchPage(state, source, model, modifier, compact)
         ExtraPage.GUIDE -> GuidePage(state, source, model, modifier, compact)
+        ExtraPage.REPLAY -> ReplayPage(state, source, model, modifier, compact)
     }
 }
 

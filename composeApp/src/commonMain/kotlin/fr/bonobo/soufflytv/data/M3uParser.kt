@@ -30,6 +30,10 @@ object M3uParser {
         var attrs: Map<String, String> = emptyMap()
         var extGroup: String? = null
         var headers = HashMap<String, String>()
+        // Replay déclaré pour toute la liste dans l'en-tête (#EXTM3U catchup="…" catchup-days="…")
+        var listCatchup: String? = null
+        var listCatchupSource: String? = null
+        var listCatchupDays: Int? = null
 
         for (raw in text.lineSequence()) {
             val line = raw.trim().removePrefix("﻿")
@@ -39,6 +43,11 @@ object M3uParser {
                 line.startsWith("#EXTM3U", ignoreCase = true) -> {
                     attrRegex.findAll(line).forEach { m ->
                         val key = m.groupValues[1].lowercase()
+                        when (key) {
+                            "catchup", "catchup-type" -> listCatchup = m.groupValues[2].trim().ifEmpty { null }
+                            "catchup-source" -> listCatchupSource = m.groupValues[2].trim().ifEmpty { null }
+                            "catchup-days", "timeshift", "tvg-rec" -> listCatchupDays = m.groupValues[2].trim().toIntOrNull()
+                        }
                         if (key == "url-tvg" || key == "x-tvg-url" || key == "tvg-url") {
                             m.groupValues[2].split(',').map { it.trim() }.filter { it.startsWith("http", ignoreCase = true) }
                                 .forEach { epgUrls += it }
@@ -77,6 +86,17 @@ object M3uParser {
                     val group = attrs["group-title"]?.takeIf { it.isNotBlank() }
                         ?: extGroup?.takeIf { it.isNotBlank() }
                         ?: NO_GROUP
+                    // Replay : catchup="default|append|shift|flussonic|xc", catchup-days, catchup-source (façon Kodi)
+                    val catchup = (attrs["catchup"] ?: attrs["catchup-type"])?.takeIf { it.isNotBlank() } ?: listCatchup
+                    val catchupSource = attrs["catchup-source"]?.takeIf { it.isNotBlank() } ?: listCatchupSource
+                    val days = (attrs["catchup-days"] ?: attrs["timeshift"] ?: attrs["tvg-rec"])?.trim()?.toIntOrNull()
+                        ?: listCatchupDays
+                    val archiveDays = when {
+                        catchup.equals("disabled", ignoreCase = true) -> 0
+                        days != null -> days.coerceIn(0, 30)
+                        catchup != null || catchupSource != null -> 1
+                        else -> 0
+                    }
                     result += Channel(
                         // Identifiant stable d'un téléchargement à l'autre (favoris, historique)
                         id = "m3u:" + "$line|$name".hashCode().toUInt().toString(16),
@@ -88,6 +108,9 @@ object M3uParser {
                         headers = headers,
                         type = guessType(line),
                         epgId = attrs["tvg-id"]?.takeIf { it.isNotBlank() },
+                        catchup = catchup,
+                        catchupSource = catchupSource,
+                        archiveDays = archiveDays,
                     )
                     title = null
                     attrs = emptyMap()

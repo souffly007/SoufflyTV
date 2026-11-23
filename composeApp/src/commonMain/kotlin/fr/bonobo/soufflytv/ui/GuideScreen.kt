@@ -64,6 +64,8 @@ import fr.bonobo.soufflytv.data.ChannelGroup
 import fr.bonobo.soufflytv.data.ChannelVariant
 import fr.bonobo.soufflytv.data.HOUR_MS
 import fr.bonobo.soufflytv.data.variantFor
+import fr.bonobo.soufflytv.data.isReplayable
+import fr.bonobo.soufflytv.data.replayOf
 import fr.bonobo.soufflytv.model.Programme
 import fr.bonobo.soufflytv.model.Source
 import fr.bonobo.soufflytv.platform.formatClock
@@ -119,7 +121,7 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
     val clock = rememberGuideClock()
     val minStart = floorHalfHour(clock) - 2 * HOUR_MS
     val maxStart = floorHalfHour(clock) + 30 * HOUR_MS
-    var chooser by remember { mutableStateOf<Pair<ChannelGroup, Int>?>(null) }
+    var chooser by remember { mutableStateOf<GuideChoice?>(null) }
 
     LaunchedEffect(Unit) {
         model.prepareGuide()
@@ -135,11 +137,26 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
         onDispose { model.enterContent = null }
     }
 
-    /** Lance la chaîne : choix de la qualité d'abord s'il y a plusieurs versions. */
-    fun play(group: ChannelGroup) {
+    /**
+     * Lance la chaîne (ou le replay d'une émission terminée, si le fournisseur l'archive) :
+     * choix de la qualité d'abord s'il y a plusieurs versions.
+     */
+    fun play(group: ChannelGroup, programme: Programme?) {
         val index = model.guideGroups.indexOf(group).coerceAtLeast(0)
+        val now = nowMillis()
+        if (programme != null && programme.stop <= now) {
+            val archived = group.variants.filter { isReplayable(it.channel, programme, now) }
+            if (archived.size > 1) {
+                chooser = GuideChoice(group.copy(variants = archived), index, programme)
+                return
+            }
+            if (archived.size == 1) {
+                state.play(source, listOf(archived.first().channel.replayOf(programme)), 0)
+                return
+            }
+        }
         if (group.variants.size > 1) {
-            chooser = group to index
+            chooser = GuideChoice(group, index, null)
         } else {
             startGuidePlayback(state, source, model, group.variants.first(), index)
         }
@@ -214,7 +231,7 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
                                 clock = clock,
                                 target = target,
                                 onTargetFocus = { targetFocused = it },
-                                onPlay = { play(group) },
+                                onPlay = { programme -> play(group, programme) },
                             )
                         }
                     }
@@ -224,19 +241,28 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
         }
     }
 
-    chooser?.let { (group, index) ->
+    chooser?.let { choice ->
         QualityChooser(
-            group = group,
+            group = choice.group,
             preferred = state.settings.value.preferredQuality,
+            subtitle = if (choice.programme != null) "Replay : ${choice.programme.title}" else "Choisis la qualité",
             onDismiss = { chooser = null },
             onChoose = { variant ->
                 chooser = null
                 state.settings.update { it.copy(preferredQuality = variant.quality) }
-                startGuidePlayback(state, source, model, variant, index)
+                val programme = choice.programme
+                if (programme != null) {
+                    state.play(source, listOf(variant.channel.replayOf(programme)), 0)
+                } else {
+                    startGuidePlayback(state, source, model, variant, choice.index)
+                }
             },
         )
     }
 }
+
+/** Fenêtre de choix de la qualité : pour le direct ([programme] null) ou pour le replay d'une émission. */
+private data class GuideChoice(val group: ChannelGroup, val index: Int, val programme: Programme?)
 
 /**
  * Lecture depuis le guide : la liste du lecteur (zapping CH+ / CH−) reprend les chaînes du guide,
@@ -354,7 +380,13 @@ private fun androidx.compose.foundation.layout.RowScope.GuideDetailContent(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(programmeTiming(programme, clock), color = Cm.TextMuted, fontSize = 13.sp, maxLines = 1)
+                val replay = programme.stop <= clock && group.variants.any { isReplayable(it.channel, programme, clock) }
+                Text(
+                    programmeTiming(programme, clock) + if (replay) " · ⟲ replay disponible" else "",
+                    color = if (replay) Cm.Cyan else Cm.TextMuted,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                )
                 programme.description?.takeIf { it.isNotBlank() }?.let {
                     Text(
                         it,
@@ -472,7 +504,7 @@ private fun GuideRow(
     clock: Long,
     target: FocusRequester,
     onTargetFocus: (Boolean) -> Unit,
-    onPlay: () -> Unit,
+    onPlay: (Programme?) -> Unit,
 ) {
     val programmes by produceState(initialValue = emptyList<Programme>(), group.key, model.epgVersion) {
         value = loadProgrammes(model, group)
@@ -521,7 +553,7 @@ private fun GuideRow(
                 .tvClickable(
                     selected = selection != null && selection.groupKey == group.key && selection.start == null,
                     shape = RoundedCornerShape(6.dp),
-                    onClick = onPlay,
+                    onClick = { onPlay(null) },
                 )
                 .background(Cm.Surface)
                 .padding(horizontal = 8.dp),
@@ -556,7 +588,7 @@ private fun GuideRow(
                         Modifier
                             .padding(end = 2.dp, bottom = 2.dp)
                             .background(Cm.Surface.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                            .tvClickable(shape = RoundedCornerShape(6.dp), onClick = onPlay)
+                            .tvClickable(shape = RoundedCornerShape(6.dp), onClick = { onPlay(null) })
                             .padding(horizontal = 10.dp),
                         contentAlignment = Alignment.CenterStart,
                     ) {
@@ -568,6 +600,7 @@ private fun GuideRow(
                     ProgrammeCell(
                         programme = p,
                         clock = clock,
+                        replay = p.stop <= clock && group.variants.any { isReplayable(it.channel, p, clock) },
                         selected = selection != null && selection.groupKey == group.key && selection.start == p.start,
                         textShift = {
                             ((model.guideViewStart - p.start) / MINUTE.toFloat() * metrics.pxPerMinute)
@@ -609,7 +642,7 @@ private fun GuideRow(
                         onClick = {
                             val already = selection != null && selection.groupKey == group.key && selection.start == p.start
                             // Télécommande : OK lance ; au doigt / à la souris : 1er appui = choisir, 2e = regarder
-                            if (keyNavigation || already) onPlay() else model.guideSelection = GuideSelection(group.key, p.start)
+                            if (keyNavigation || already) onPlay(p) else model.guideSelection = GuideSelection(group.key, p.start)
                         },
                     )
                 }
@@ -640,6 +673,7 @@ private fun GuideRow(
 private fun ProgrammeCell(
     programme: Programme,
     clock: Long,
+    replay: Boolean,
     selected: Boolean,
     textShift: () -> Int,
     modifier: Modifier,
@@ -666,17 +700,18 @@ private fun ProgrammeCell(
         // Le titre reste lisible au bord gauche quand l'émission a commencé avant le début de la frise
         Column(Modifier.offset { IntOffset(textShift(), 0) }.padding(horizontal = 8.dp)) {
             Text(
-                programme.title,
-                color = if (past) Cm.TextMuted else Cm.Text,
+                // ⟲ : émission terminée qu'on peut revoir (replay)
+                if (replay) "⟲ ${programme.title}" else programme.title,
+                color = if (past && !replay) Cm.TextMuted else Cm.Text,
                 fontSize = 13.sp,
                 fontWeight = if (onAir) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${formatClock(programme.start)} – ${formatClock(programme.stop)}",
+                "${formatClock(programme.start)} – ${formatClock(programme.stop)}" + if (replay) " · replay" else "",
                 style = MonoLabel,
-                color = if (onAir) Cm.Cyan else Cm.TextMuted,
+                color = if (onAir || replay) Cm.Cyan else Cm.TextMuted,
                 maxLines = 1,
             )
         }
@@ -690,9 +725,10 @@ private fun ProgrammeCell(
 // ---------- Choix de la qualité ----------
 
 @Composable
-private fun QualityChooser(
+internal fun QualityChooser(
     group: ChannelGroup,
     preferred: String,
+    subtitle: String = "Choisis la qualité",
     onDismiss: () -> Unit,
     onChoose: (ChannelVariant) -> Unit,
 ) {
@@ -717,7 +753,7 @@ private fun QualityChooser(
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(group.name, color = Cm.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("Choisis la qualité", color = Cm.TextMuted, fontSize = 13.sp)
+                    Text(subtitle, color = Cm.TextMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
             Spacer(Modifier.height(14.dp))

@@ -8,6 +8,7 @@ import fr.bonobo.soufflytv.model.Section
 import fr.bonobo.soufflytv.model.SeriesInfo
 import fr.bonobo.soufflytv.model.Source
 import fr.bonobo.soufflytv.model.StreamRequest
+import fr.bonobo.soufflytv.platform.nowMillis
 import io.ktor.client.HttpClient
 
 /** Ce que l'interface attend de chaque type de source. */
@@ -37,6 +38,24 @@ interface IptvProvider {
 
     /** Émission en cours, depuis le guide déjà chargé (sans réseau). */
     fun epgNow(channel: Channel): Programme? = null
+
+    // ---------- Replay ----------
+
+    /** true si au moins une chaîne a des archives : le menu Replay s'affiche. */
+    suspend fun hasReplay(): Boolean = channels(Section.LIVE, null).any { it.archiveDays > 0 }
+
+    /**
+     * Émissions qu'on peut relire sur une chaîne (de la plus ancienne à la plus récente).
+     * Par défaut : le guide TV, limité à la période d'archives.
+     */
+    suspend fun replayProgrammes(channel: Channel): List<Programme> {
+        val now = nowMillis()
+        return epg(channel).filter { isReplayable(channel, it, now) }
+    }
+
+    /** Lien de lecture d'un replay ([replay] vient de [replayOf]). */
+    suspend fun resolveReplay(replay: Channel): StreamRequest =
+        throw IptvException("Pas de replay pour cette chaîne chez ce fournisseur")
 
     /** Fiche d'un film. Par défaut : ce que la liste fournit déjà (titre, affiche, résumé éventuel). */
     suspend fun movieInfo(movie: Channel): MovieInfo = MovieInfo(movie.name, movie.plot, movie.logo)

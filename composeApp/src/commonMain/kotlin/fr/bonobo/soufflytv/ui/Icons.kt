@@ -27,6 +27,11 @@ object AppIcons {
         "M21,3H3c-1.1,0 -2,0.9 -2,2v12c0,1.1 0.9,2 2,2h5v2h8v-2h5c1.1,0 1.99,-0.9 1.99,-2L23,5c0,-1.1 -0.9,-2 -2,-2zM21,17H3V5h18v12z",
     )
     val Play = icon("play", "M8,5v14l11,-7z")
+    /** Replay : flèche qui revient en arrière autour d'une horloge (history). */
+    val Replay = icon(
+        "replay",
+        "M13,3c-4.97,0 -9,4.03 -9,9L1,12l3.89,3.89 0.07,0.14L9,12L6,12c0,-3.87 3.13,-7 7,-7s7,3.13 7,7 -3.13,7 -7,7c-1.93,0 -3.68,-0.79 -4.94,-2.06l-1.42,1.42C8.27,19.99 10.51,21 13,21c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9zM12,8v5l4.28,2.54 0.72,-1.21 -3.5,-2.08L13.5,8L12,8z",
+    )
     val Guide = icon("guide", "M3,17h18v2L3,19zM3,10h18v5L3,15zM3,4h18v4L3,8z")
     val Dns = icon(
         "dns",

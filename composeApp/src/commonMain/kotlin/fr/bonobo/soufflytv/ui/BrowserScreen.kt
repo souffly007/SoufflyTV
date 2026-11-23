@@ -225,6 +225,9 @@ private fun PhoneBottomBar(model: BrowserModel, onSettings: () -> Unit) {
                 BottomItem(icon, label, selected = !model.showHome && extra == null && model.section == s) { model.selectSection(s) }
                 if (s == Section.LIVE) {
                     BottomItem(AppIcons.Guide, "Guide", selected = extra == ExtraPage.GUIDE) { model.openExtra(ExtraPage.GUIDE) }
+                    if (model.replayAvailable) {
+                        BottomItem(AppIcons.Replay, "Replay", selected = extra == ExtraPage.REPLAY) { model.openExtra(ExtraPage.REPLAY) }
+                    }
                 }
             }
             // Ma liste et Historique : déjà là dans chaque rubrique (catégories ★ Favoris et Récents)
@@ -331,6 +334,9 @@ private fun SideRail(
                     RailItem(icon, label, expanded, selected = !model.showHome && extra == null && s == model.section) { model.selectSection(s) }
                     if (s == Section.LIVE) {
                         RailItem(AppIcons.Guide, "Guide TV", expanded, selected = extra == ExtraPage.GUIDE) { model.openExtra(ExtraPage.GUIDE) }
+                        if (model.replayAvailable) {
+                            RailItem(AppIcons.Replay, "Replay", expanded, selected = extra == ExtraPage.REPLAY) { model.openExtra(ExtraPage.REPLAY) }
+                        }
                     }
                 }
             }

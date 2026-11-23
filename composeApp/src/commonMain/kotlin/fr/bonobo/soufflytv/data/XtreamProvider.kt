@@ -52,6 +52,9 @@ class XtreamProvider(
     /** Extension des flux live autorisée par le compte (ts ou m3u8). */
     private var liveExt: String? = null
 
+    /** Fuseau horaire du serveur (server_info.timezone) : l'heure de début d'un replay s'y exprime. */
+    private var serverZone: String? = null
+
     private val categoryCache = HashMap<Section, List<Category>>()
     private val channelCache = HashMap<Pair<Section, String?>, List<Channel>>()
     private val seriesCache = HashMap<String, SeriesInfo>()
@@ -89,6 +92,7 @@ class XtreamProvider(
         if (status != null && !status.equals("Active", ignoreCase = true)) {
             throw IptvException("Compte inactif (statut : $status)")
         }
+        serverZone = (info["server_info"] as? JsonObject)?.s("timezone")
         val formats = (user["allowed_output_formats"] as? JsonArray)
             ?.mapNotNull { (it as? JsonPrimitive)?.content }
             .orEmpty()
@@ -144,6 +148,10 @@ class XtreamProvider(
                             type = ItemType.LIVE,
                             epgId = id,
                             tvgId = o.s("epg_channel_id"),
+                            // Replay : tv_archive = 1, tv_archive_duration = nombre de jours gardés
+                            archiveDays = if (o.s("tv_archive") == "1") {
+                                (o.s("tv_archive_duration")?.toIntOrNull() ?: 1).coerceIn(1, 30)
+                            } else 0,
                         )
                     }
                     Section.MOVIES -> {
@@ -389,6 +397,50 @@ class XtreamProvider(
     override fun epgNow(channel: Channel): Programme? {
         val now = nowMillis()
         return xmltv?.get(channel.id)?.firstOrNull { it.isOnAir(now) }
+    }
+
+    // ---------- Replay ----------
+
+    private val replayCache = HashMap<String, Pair<Long, List<Programme>>>()
+
+    /**
+     * Émissions archivées : get_simple_data_table donne tout le guide connu de la chaîne,
+     * avec has_archive = 1 pour celles qu'on peut relire. Repli : le guide, limité à la période d'archives.
+     */
+    override suspend fun replayProgrammes(channel: Channel): List<Programme> {
+        if (channel.archiveDays <= 0) return emptyList()
+        val streamId = channel.epgId ?: return emptyList()
+        replayCache[streamId]?.let { (time, list) -> if (nowMillis() - time < 10 * MINUTE_MS) return list }
+        val now = nowMillis()
+        val json = try {
+            ensureLogin()
+            api("get_simple_data_table", "stream_id" to streamId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            null
+        }
+        val listings = (json as? JsonObject)?.get("epg_listings").asObjects()
+        val fromTable = listings.mapNotNull { o ->
+            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000) ?: return@mapNotNull null
+            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000) ?: (start + HOUR_MS)
+            val title = decodeBase64OrRaw(o.s("title")) ?: return@mapNotNull null
+            val archived = o.s("has_archive")
+            val programme = Programme(start, stop, title, decodeBase64OrRaw(o.s("description")))
+            programme.takeIf { (archived == null || archived == "1") && isReplayable(channel, it, now) }
+        }.distinctBy { it.start }.sortedBy { it.start }
+        val list = fromTable.ifEmpty { epg(channel).filter { isReplayable(channel, it, now) } }
+        replayCache[streamId] = now to list
+        return list
+    }
+
+    override suspend fun resolveReplay(replay: Channel): StreamRequest {
+        val start = replay.replayStart ?: throw IptvException("Émission inconnue")
+        val stop = replay.replayStop ?: (start + HOUR_MS)
+        val streamId = replay.epgId ?: throw IptvException("Chaîne inconnue")
+        ensureLogin()
+        val url = xtreamTimeshiftUrl(base, userPath, passPath, streamId, start, stop, serverZone, liveExt ?: "ts")
+        return StreamRequest(url, replay.name, mapOf("User-Agent" to DEFAULT_USER_AGENT))
     }
 
     override suspend fun epg(channel: Channel): List<Programme> {

@@ -251,7 +251,16 @@ class StalkerProvider(
             number = o.s("number")?.toIntOrNull(),
             type = ItemType.LIVE,
             epgId = id,
+            archiveDays = stalkerArchiveDays(o),
         )
+    }
+
+    /** Replay : enable_tv_archive / tv_archive = 1, tv_archive_duration en heures. */
+    private fun stalkerArchiveDays(o: JsonObject): Int {
+        val enabled = o.s("enable_tv_archive") == "1" || o.s("tv_archive") == "1"
+        if (!enabled) return 0
+        val hours = o.s("tv_archive_duration")?.toIntOrNull() ?: 0
+        return if (hours <= 0) 3 else ((hours + 23) / 24).coerceIn(1, 30)
     }
 
     // ---------- Films ----------
@@ -468,6 +477,67 @@ class StalkerProvider(
             ?: throw IptvException("Le portail n'a pas fourni de lien de lecture")
         if ("://localhost" in url) throw IptvException("Le portail n'a pas fourni de lien de lecture valide")
         return StreamRequest(url, channel.name, mapOf("User-Agent" to MAG_USER_AGENT))
+    }
+
+    // ---------- Replay ----------
+
+    private val replayCache = HashMap<String, Pair<Long, List<Programme>>>()
+
+    /**
+     * Émissions archivées : get_all_program_for_ch si le portail le connaît, sinon
+     * get_simple_data_table jour par jour (mark_archive = 1 pour celles qu'on peut relire).
+     */
+    override suspend fun replayProgrammes(channel: Channel): List<Programme> {
+        if (channel.archiveDays <= 0) return emptyList()
+        val chId = channel.epgId ?: return emptyList()
+        replayCache[chId]?.let { (time, list) -> if (nowMillis() - time < 10 * MINUTE_MS) return list }
+        val now = nowMillis()
+        fun parse(items: List<JsonObject>) = items.mapNotNull { o ->
+            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000) ?: return@mapNotNull null
+            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000) ?: (start + HOUR_MS)
+            val title = o.s("name") ?: return@mapNotNull null
+            val archived = o.s("mark_archive")
+            Programme(start, stop, title, o.s("descr"), id = o.s("id"))
+                .takeIf { (archived == null || archived == "1") && isReplayable(channel, it, now) }
+        }
+        fun items(js: JsonElement?): List<JsonObject> =
+            if (js is JsonObject && js["data"] != null) js["data"].asObjects() else js.asObjects()
+
+        var list = parse(items(apiOrNull(listOf("type" to "epg", "action" to "get_all_program_for_ch", "ch_id" to chId))))
+        if (list.isEmpty()) {
+            val found = ArrayList<Programme>()
+            for (day in 0 until channel.archiveDays.coerceAtMost(7)) {
+                val date = fr.bonobo.soufflytv.platform.formatZoned(now - day * 24 * HOUR_MS, null, "yyyy-MM-dd")
+                for (page in 1..10) {
+                    val js = apiOrNull(
+                        listOf("type" to "epg", "action" to "get_simple_data_table", "ch_id" to chId, "date" to date, "p" to page.toString())
+                    )
+                    val pageItems = items(js)
+                    if (pageItems.isEmpty()) break
+                    found += parse(pageItems)
+                    val total = (js as? JsonObject)?.s("total_items")?.toIntOrNull()
+                    val perPage = (js as? JsonObject)?.s("max_page_items")?.toIntOrNull()
+                    if (total == null || perPage == null || page * perPage >= total) break
+                }
+            }
+            list = found
+        }
+        list = list.filter { it.id != null }.distinctBy { it.start }.sortedBy { it.start }
+        replayCache[chId] = now to list
+        return list
+    }
+
+    override suspend fun resolveReplay(replay: Channel): StreamRequest {
+        val programmeId = replay.replayId ?: throw IptvException("Le portail n'a pas donné d'identifiant pour cette émission")
+        val linked = (api(
+            listOf(
+                "type" to "tv_archive", "action" to "create_link", "cmd" to "auto /media/$programmeId.mpg",
+                "series" to "", "forced_storage" to "", "disable_ad" to "0", "download" to "0",
+            )
+        ) as? JsonObject)?.s("cmd")
+        val url = linked?.let(::extractStreamUrl)
+            ?: throw IptvException("Le portail n'a pas fourni de lien de replay")
+        return StreamRequest(url, replay.name, mapOf("User-Agent" to MAG_USER_AGENT))
     }
 
     // ---------- Guide TV ----------

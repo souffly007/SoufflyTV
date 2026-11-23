@@ -39,7 +39,7 @@ const val RECENTS = "__recent__"
 const val NOW_ON = "__now__"
 
 /** Pages en plus des rubriques : Ma liste, Historique, Recherche. */
-enum class ExtraPage { MY_LIST, HISTORY, SEARCH, GUIDE }
+enum class ExtraPage { MY_LIST, HISTORY, SEARCH, GUIDE, REPLAY }
 
 /** Guide TV : émission choisie (focus ou toucher) ; [start] à null = la chaîne elle-même. */
 data class GuideSelection(val groupKey: String, val start: Long?)
@@ -196,6 +196,66 @@ class BrowserModel(
         }
     }
 
+    // ---------- Replay ----------
+
+    /** true si le fournisseur propose le replay sur au moins une chaîne : le menu Replay s'affiche. */
+    var replayAvailable by mutableStateOf(false)
+        private set
+    /** Chaînes avec archives, regroupées (SD / HD… sur une ligne), et les groupes qui en contiennent. */
+    var replayGroups by mutableStateOf<List<ChannelGroup>>(emptyList())
+        private set
+    var replayCategories by mutableStateOf<List<Category>>(emptyList())
+        private set
+    var replayCategory by mutableStateOf<Category?>(null)
+        private set
+    var replayLoading by mutableStateOf(false)
+        private set
+    /** Chaîne choisie (clé du groupe) et jour choisi (« Aujourd'hui », « Hier »…). */
+    var replayGroupKey by mutableStateOf<String?>(null)
+    var replayDay by mutableStateOf<String?>(null)
+    val replayListState = LazyListState()
+    private var replayAll: List<Channel> = emptyList()
+    private var replayStarted = false
+    private var replayChecked = false
+
+    /** Vérifie une fois, en arrière-plan, si le fournisseur propose le replay. */
+    fun checkReplay() {
+        if (replayChecked || Section.LIVE !in sections) return
+        replayChecked = true
+        scope.launch { replayAvailable = safely { provider.hasReplay() } == true }
+    }
+
+    /** À l'ouverture de la page Replay : chaînes avec archives et leurs groupes. */
+    fun prepareReplay() {
+        if (replayStarted) return
+        replayStarted = true
+        scope.launch {
+            replayLoading = true
+            val all = safely { channelsFor(Section.LIVE, Category(ALL_CATEGORIES, "")) }.orEmpty()
+                .filter { it.type == ItemType.LIVE && it.archiveDays > 0 }
+            replayAll = all
+            val withReplay = all.mapNotNull { it.categoryId }.toSet()
+            val groups = safely { provider.categories(Section.LIVE) }.orEmpty().filter { it.id in withReplay }
+            replayCategories = listOf(Category(ALL_CATEGORIES, "Toutes")) + groups
+            selectReplayCategory(replayCategories.first())
+            replayLoading = false
+            if (all.isEmpty()) replayStarted = false
+        }
+    }
+
+    fun selectReplayCategory(category: Category) {
+        replayCategory = category
+        val list = if (category.id == ALL_CATEGORIES) replayAll else replayAll.filter { it.categoryId == category.id }
+        scope.launch {
+            replayGroups = withContext(Dispatchers.Default) { groupVariants(list) }
+            if (replayGroups.none { it.key == replayGroupKey }) {
+                replayGroupKey = if (wide) replayGroups.firstOrNull()?.key else null
+                replayDay = null
+            }
+            replayListState.scrollToItem(0)
+        }
+    }
+
     /** TV en direct, grand écran : chaîne présentée (et lue en petit) dans l'aperçu au-dessus de la liste. */
     var previewChannel by mutableStateOf<Channel?>(null)
 
@@ -319,6 +379,7 @@ class BrowserModel(
         if (started) return
         started = true
         loadCategories()
+        checkReplay()
     }
 
     fun retry() {
@@ -389,6 +450,12 @@ class BrowserModel(
 
     /** Retour système en écran étroit : revenir aux catégories avant de quitter la source. */
     fun consumeBack(): Boolean {
+        // Replay sur smartphone : de la liste des émissions à celle des chaînes
+        if (extraPage == ExtraPage.REPLAY && !wide && replayGroupKey != null) {
+            replayGroupKey = null
+            replayDay = null
+            return true
+        }
         // Ma liste, Historique, Recherche : retour à l'accueil
         if (extraPage != null) {
             goHome()

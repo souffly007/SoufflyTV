@@ -85,6 +85,7 @@ import fr.bonobo.soufflytv.data.formatDuration
 import fr.bonobo.soufflytv.data.toUserMessage
 import fr.bonobo.soufflytv.model.Channel
 import fr.bonobo.soufflytv.model.ItemType
+import fr.bonobo.soufflytv.model.isReplay
 import fr.bonobo.soufflytv.model.Programme
 import fr.bonobo.soufflytv.model.StreamRequest
 import fr.bonobo.soufflytv.platform.FullscreenEffect
@@ -120,7 +121,8 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
     var playlist by remember(screen) { mutableStateOf(screen.channels) }
     var index by remember(screen) { mutableIntStateOf(screen.index) }
     val channel = playlist[index.coerceIn(0, playlist.lastIndex)]
-    val live = channel.type == ItemType.LIVE
+    // Un replay se lit comme un film (avance, recul, pause), pas comme le direct
+    val live = channel.type == ItemType.LIVE && !channel.isReplay
     val resumeKey = "${source.id}|${channel.id}"
 
     var aspect by remember { mutableStateOf(settings.aspect) }
@@ -248,7 +250,7 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
         request = null
         status = PlayerStatus.Loading
         try {
-            request = provider.resolve(channel)
+            request = if (channel.isReplay) provider.resolveReplay(channel) else provider.resolve(channel)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -265,7 +267,8 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
                 autoRetries = 0
                 if (!recorded) {
                     recorded = true
-                    state.library.addRecent(source.id, channel)
+                    // les replays ne vont pas dans « Récents » (ce ne sont pas des chaînes)
+                    if (!channel.isReplay) state.library.addRecent(source.id, channel)
                 }
             }
             reconnecting -> {
@@ -726,12 +729,14 @@ private fun PlayerTopBar(
                 Icon(AppIcons.ChannelList, contentDescription = "Liste des chaînes", tint = Cm.Cyan)
             }
         }
-        IconButton(onClick = onFavorite) {
-            Icon(
-                if (favorite) AppIcons.Star else AppIcons.StarBorder,
-                contentDescription = if (favorite) "Retirer des favoris" else "Ajouter aux favoris",
-                tint = if (favorite) Cm.Cyan else Cm.Text,
-            )
+        if (!channel.isReplay) {
+            IconButton(onClick = onFavorite) {
+                Icon(
+                    if (favorite) AppIcons.Star else AppIcons.StarBorder,
+                    contentDescription = if (favorite) "Retirer des favoris" else "Ajouter aux favoris",
+                    tint = if (favorite) Cm.Cyan else Cm.Text,
+                )
+            }
         }
         // Bouton AD : seulement si la chaîne propose une piste d'audiodescription et une piste normale
         val tracks = controller.audioTracks
@@ -751,7 +756,7 @@ private fun PlayerTopBar(
             }
         }
         // Films et séries : les menus restent visibles même avec une seule piste (on voit ce que contient le fichier)
-        val vod = channel.type != ItemType.LIVE
+        val vod = channel.type != ItemType.LIVE || channel.isReplay
         if (controller.audioTracks.size > 1 || vod) {
             TrackMenu(
                 icon = { Icon(AppIcons.Audio, contentDescription = "Piste audio", tint = Cm.Text) },
@@ -779,7 +784,7 @@ private fun PlayerTopBar(
             )
         }
         // Vitesse de lecture : films et séries seulement
-        if (channel.type != ItemType.LIVE) {
+        if (vod) {
             TrackMenu(
                 icon = {
                     Text(

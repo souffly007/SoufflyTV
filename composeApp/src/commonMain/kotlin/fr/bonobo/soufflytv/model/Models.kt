@@ -86,7 +86,19 @@ data class Channel(
     val rating: String? = null,
     /** Date d'ajout chez le fournisseur (ms), pour les « Nouveautés » de l'accueil. */
     val added: Long? = null,
+    /** Replay : nombre de jours d'archives proposés par le fournisseur (0 = pas de replay). */
+    val archiveDays: Int = 0,
+    /** Replay M3U : type (default, append, shift, flussonic, xc) et modèle de lien (catchup-source). */
+    val catchup: String? = null,
+    val catchupSource: String? = null,
+    /** Lecture d'un replay : début et fin de l'émission (ms), identifiant côté portail (Stalker). */
+    val replayStart: Long? = null,
+    val replayStop: Long? = null,
+    val replayId: String? = null,
 )
+
+/** true pour une émission passée relue (replay) : elle se lit comme un film. */
+val Channel.isReplay: Boolean get() = replayStart != null
 
 /** Une émission du guide TV (heures en millisecondes UTC). */
 data class Programme(
@@ -94,6 +106,8 @@ data class Programme(
     val stop: Long,
     val title: String,
     val description: String? = null,
+    /** Identifiant de l'émission chez le fournisseur (replay Stalker). */
+    val id: String? = null,
 ) {
     fun isOnAir(now: Long): Boolean = now >= start && now < stop
 

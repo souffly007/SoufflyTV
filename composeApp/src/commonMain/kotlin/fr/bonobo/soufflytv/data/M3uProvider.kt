@@ -76,6 +76,14 @@ class M3uProvider(
         return StreamRequest(channel.stream, channel.name, headers)
     }
 
+    override suspend fun resolveReplay(replay: Channel): StreamRequest {
+        val start = replay.replayStart ?: throw IptvException("Émission inconnue")
+        val stop = replay.replayStop ?: (start + HOUR_MS)
+        val url = m3uCatchupUrl(replay, start, stop, nowMillis())
+            ?: throw IptvException("Type de replay non reconnu pour cette chaîne (catchup=\"${replay.catchup.orEmpty()}\")")
+        return resolve(replay).copy(url = url)
+    }
+
     // ---------- Guide TV (XMLTV) ----------
 
     private fun epgUrls(): List<String> {

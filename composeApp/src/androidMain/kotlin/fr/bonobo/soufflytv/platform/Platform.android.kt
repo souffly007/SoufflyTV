@@ -159,6 +159,11 @@ actual fun formatClock(epochMillis: Long): String =
 
 private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d", java.util.Locale.FRENCH)
 
+actual fun formatZoned(epochMillis: Long, zoneId: String?, pattern: String): String {
+    val zone = zoneId?.takeIf { it.isNotBlank() }?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
+    return DateTimeFormatter.ofPattern(pattern, java.util.Locale.ROOT).format(Instant.ofEpochMilli(epochMillis).atZone(zone))
+}
+
 actual fun formatDay(epochMillis: Long): String {
     val zone = ZoneId.systemDefault()
     val day = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
