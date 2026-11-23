@@ -64,6 +64,7 @@ import fr.bonobo.soufflytv.data.ChannelGroup
 import fr.bonobo.soufflytv.data.ChannelVariant
 import fr.bonobo.soufflytv.data.HOUR_MS
 import fr.bonobo.soufflytv.data.variantFor
+import fr.bonobo.soufflytv.data.Reminder
 import fr.bonobo.soufflytv.data.isReplayable
 import fr.bonobo.soufflytv.data.replayOf
 import fr.bonobo.soufflytv.model.Programme
@@ -122,6 +123,8 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
     val minStart = floorHalfHour(clock) - 2 * HOUR_MS
     val maxStart = floorHalfHour(clock) + 30 * HOUR_MS
     var chooser by remember { mutableStateOf<GuideChoice?>(null) }
+    /** Appui long sur une émission : menu Regarder / Me rappeler / Replay. */
+    var actions by remember { mutableStateOf<Pair<ChannelGroup, Programme>?>(null) }
 
     LaunchedEffect(Unit) {
         model.prepareGuide()
@@ -184,7 +187,7 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
             start = selection?.start,
             clock = clock,
             compact = compact,
-            onWatch = if (remoteNavigation()) null else selectedGroup?.let { g -> { programme -> play(g, programme) } },
+            onWatch = if (remoteNavigation()) null else selectedGroup?.let { g -> { play(g) } },
         )
 
         val density = LocalDensity.current
@@ -232,6 +235,10 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
                                 target = target,
                                 onTargetFocus = { targetFocused = it },
                                 onPlay = { programme -> play(group, programme) },
+                                onLongPress = { programme -> actions = group to programme },
+                                hasReminder = { programme ->
+                                    state.reminders.find(source.id, group.variants.map { it.channel.id }, programme.start) != null
+                                },
                             )
                         }
                     }
@@ -239,6 +246,21 @@ fun GuidePage(state: AppState, source: Source, model: BrowserModel, modifier: Mo
             }
             NowLine(model, metrics, clock, with(density) { channelWidth.toPx() }.roundToInt(), gridWidthPx)
         }
+    }
+
+    actions?.let { (group, programme) ->
+        ProgrammeActions(
+            state = state,
+            source = source,
+            group = group,
+            programme = programme,
+            onDismiss = { actions = null },
+            onWatch = { asReplay ->
+                actions = null
+                // direct : la chaîne en ce moment ; replay : l'émission depuis le début
+                play(group, if (asReplay) programme else null)
+            },
+        )
     }
 
     chooser?.let { choice ->
@@ -318,7 +340,7 @@ private fun GuideDetail(
     start: Long?,
     clock: Long,
     compact: Boolean,
-    onWatch: ((Programme?) -> Unit)?,
+    onWatch: (() -> Unit)?,
 ) {
     val height = if (compact) 104.dp else 128.dp
     Row(
@@ -351,7 +373,7 @@ private fun androidx.compose.foundation.layout.RowScope.GuideDetailContent(
     start: Long?,
     clock: Long,
     compact: Boolean,
-    onWatch: ((Programme?) -> Unit)?,
+    onWatch: (() -> Unit)?,
 ) {
     run {
         val programmes by produceState(initialValue = emptyList<Programme>(), group.key, model.epgVersion) {
@@ -402,7 +424,7 @@ private fun androidx.compose.foundation.layout.RowScope.GuideDetailContent(
         if (onWatch != null) {
             Spacer(Modifier.width(10.dp))
             Button(
-                onClick = { onWatch(programme) },
+                onClick = onWatch,
                 colors = ButtonDefaults.buttonColors(containerColor = Cm.Cyan, contentColor = Cm.OnCyan),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp),
@@ -505,6 +527,8 @@ private fun GuideRow(
     target: FocusRequester,
     onTargetFocus: (Boolean) -> Unit,
     onPlay: (Programme?) -> Unit,
+    onLongPress: (Programme) -> Unit,
+    hasReminder: (Programme) -> Boolean,
 ) {
     val programmes by produceState(initialValue = emptyList<Programme>(), group.key, model.epgVersion) {
         value = loadProgrammes(model, group)
@@ -601,6 +625,8 @@ private fun GuideRow(
                         programme = p,
                         clock = clock,
                         replay = p.stop <= clock && group.variants.any { isReplayable(it.channel, p, clock) },
+                        reminder = p.start > clock && hasReminder(p),
+                        onLongClick = { onLongPress(p) },
                         selected = selection != null && selection.groupKey == group.key && selection.start == p.start,
                         textShift = {
                             ((model.guideViewStart - p.start) / MINUTE.toFloat() * metrics.pxPerMinute)
@@ -674,6 +700,8 @@ private fun ProgrammeCell(
     programme: Programme,
     clock: Long,
     replay: Boolean,
+    reminder: Boolean,
+    onLongClick: () -> Unit,
     selected: Boolean,
     textShift: () -> Int,
     modifier: Modifier,
@@ -694,14 +722,18 @@ private fun ProgrammeCell(
                 shape,
             )
             .then(if (selected) Modifier.border(2.dp, Cm.Cyan, shape) else Modifier)
-            .tvClickable(shape = shape, onClick = onClick),
+            .tvClickable(shape = shape, onLongClick = onLongClick, onClick = onClick),
         contentAlignment = Alignment.CenterStart,
     ) {
         // Le titre reste lisible au bord gauche quand l'émission a commencé avant le début de la frise
         Column(Modifier.offset { IntOffset(textShift(), 0) }.padding(horizontal = 8.dp)) {
             Text(
                 // ⟲ : émission terminée qu'on peut revoir (replay)
-                if (replay) "⟲ ${programme.title}" else programme.title,
+                when {
+                    replay -> "⟲ ${programme.title}"
+                    reminder -> "⏰ ${programme.title}"
+                    else -> programme.title
+                },
                 color = if (past && !replay) Cm.TextMuted else Cm.Text,
                 fontSize = 13.sp,
                 fontWeight = if (onAir) FontWeight.Bold else FontWeight.Medium,
@@ -783,6 +815,101 @@ internal fun QualityChooser(
                 Spacer(Modifier.height(8.dp))
                 Text("En surbrillance : ta dernière qualité choisie", color = Cm.TextMuted, fontSize = 11.sp)
             }
+        }
+    }
+}
+
+// ---------- Appui long : que faire de cette émission ? ----------
+
+@Composable
+private fun ProgrammeActions(
+    state: AppState,
+    source: Source,
+    group: ChannelGroup,
+    programme: Programme,
+    onDismiss: () -> Unit,
+    /** true = replay de l'émission, false = la chaîne en direct. */
+    onWatch: (asReplay: Boolean) -> Unit,
+) {
+    val now = nowMillis()
+    val future = programme.start > now
+    val ended = programme.stop <= now
+    val canReplay = ended && group.variants.any { isReplayable(it.channel, programme, now) }
+    val ids = group.variants.map { it.channel.id }
+    val reminder = state.reminders.find(source.id, ids, programme.start)
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        repeat(10) {
+            if (runCatching { first.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(50)
+        }
+    }
+
+    @Composable
+    fun Action(text: String, focus: Boolean = false, onClick: () -> Unit) {
+        Text(
+            text,
+            color = Cm.Text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 3.dp)
+                .then(if (focus) Modifier.focusRequester(first) else Modifier)
+                .tvClickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        )
+    }
+
+    AppDialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .width(420.dp)
+                .background(Cm.Surface, RoundedCornerShape(16.dp))
+                .border(1.dp, Cm.Cyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                .padding(20.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ChannelLogo(group.main.logo, group.name, size = 44.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(group.name, style = MonoLabel, color = Cm.Cyan, maxLines = 1)
+                    Text(programme.title, color = Cm.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(programmeTiming(programme, now), color = Cm.TextMuted, fontSize = 13.sp, maxLines = 1)
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            when {
+                future -> {
+                    if (reminder == null) {
+                        Action("⏰  Me rappeler à ${formatClock(programme.start)}", focus = true) {
+                            val variant = group.variantFor(state.settings.value.preferredQuality.ifEmpty { null })
+                            state.reminders.add(
+                                Reminder(source.id, variant.channel, group.name, programme.title, programme.start, programme.stop)
+                            )
+                            onDismiss()
+                        }
+                    } else {
+                        Action("⏰  Annuler le rappel", focus = true) {
+                            state.reminders.remove(reminder)
+                            onDismiss()
+                        }
+                    }
+                    Action("▶  Basculer sur la chaîne maintenant") { onWatch(false) }
+                }
+                canReplay -> {
+                    Action("⟲  Revoir cette émission (replay)", focus = true) { onWatch(true) }
+                    Action("▶  Regarder la chaîne en direct") { onWatch(false) }
+                }
+                else -> Action("▶  Regarder la chaîne", focus = true) { onWatch(false) }
+            }
+            Text(
+                "Enregistrer sur le NAS : bientôt",
+                color = Cm.TextMuted,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+            Action("Fermer", onClick = onDismiss)
         }
     }
 }

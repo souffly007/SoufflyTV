@@ -10,6 +10,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import fr.bonobo.soufflytv.platform.AndroidApp
+import fr.bonobo.soufflytv.platform.ReminderPermission
 
 class MainActivity : ComponentActivity() {
 
@@ -22,6 +23,7 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         AndroidApp.context = applicationContext
+        ReminderPermission.activity = java.lang.ref.WeakReference(this)
         state = AppState()
 
         if (!BuildConfig.IS_TV && packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {

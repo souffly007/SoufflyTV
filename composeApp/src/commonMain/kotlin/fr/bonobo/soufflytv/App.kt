@@ -25,6 +25,7 @@ import coil3.serviceLoaderEnabled
 import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.SoufflyTheme
 import fr.bonobo.soufflytv.ui.DialogLayer
+import fr.bonobo.soufflytv.ui.ReminderBanner
 import fr.bonobo.soufflytv.ui.LocalDialogHost
 import androidx.compose.runtime.CompositionLocalProvider
 
@@ -56,6 +57,8 @@ fun App(state: AppState) {
                     }
                 }
             }
+            // Rappel du guide TV : « Ça commence », par-dessus tout l'écran
+            ReminderBanner(state)
             // Ordinateur : dialogues dessinés par-dessus tout l'écran
             DialogLayer(state.dialogs)
            }

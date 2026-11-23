@@ -1,5 +1,8 @@
 package fr.bonobo.soufflytv
 
+import kotlinx.coroutines.delay
+import fr.bonobo.soufflytv.data.ReminderStore
+import fr.bonobo.soufflytv.data.Reminder
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +62,12 @@ class AppState {
 
     val library = LibraryStore(scope)
     val settings = SettingsStore(scope)
+    /** Rappels posés depuis le guide TV. */
+    val reminders = ReminderStore(scope)
+
+    /** Rappel dont l'émission commence : bandeau « Ça commence » affiché par-dessus l'écran. */
+    var dueReminder by mutableStateOf<Reminder?>(null)
+        private set
     val sources: StateFlow<List<Source>> = repository.sources
 
     var loaded by mutableStateOf(false)
@@ -97,10 +106,39 @@ class AppState {
         scope.launch {
             settings.load()
             library.load()
+            reminders.load()
             repository.load()
             loaded = true
             if (settings.value.resumeLastChannel) resumeLastChannel()
+            watchReminders()
         }
+    }
+
+    /** Toutes les 15 s : un rappel dont l'émission commence (dans la minute) s'affiche. */
+    private suspend fun watchReminders() {
+        while (true) {
+            val now = nowMillis()
+            reminders.cleanup(now)
+            if (dueReminder == null) {
+                dueReminder = reminders.reminders.firstOrNull { now >= it.start - 60_000 && now < it.stop }
+            }
+            delay(15_000)
+        }
+    }
+
+    /** « Regarder » : lance la chaîne du rappel (remplace la lecture en cours s'il y en a une). */
+    fun watchReminder(reminder: Reminder) {
+        reminders.remove(reminder)
+        dueReminder = null
+        val source = sourceById(reminder.sourceId) ?: return
+        val target = Screen.Player(source, listOf(reminder.channel), 0)
+        if (screen is Screen.Player) screen = target else navigate(target)
+    }
+
+    /** « Ignorer » : le rappel est retiré. */
+    fun dismissReminder(reminder: Reminder) {
+        reminders.remove(reminder)
+        dueReminder = null
     }
 
     /** Démarrage façon TiviMate : on rouvre la source et on relance la dernière chaîne en direct. */

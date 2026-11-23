@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.9.5 && git push origin v0.9.5
+git tag v0.9.6 && git push origin v0.9.6
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -191,6 +191,11 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] Grille horaire façon TiviMate : une ligne par chaîne, émissions sur la frise, ligne « maintenant », titre et résumé de l'émission choisie en haut
 - [x] Les versions d'une même chaîne (SD, HD, FHD, UHD/4K, HEVC…) sont **regroupées sur une seule ligne** ; au lancement, choix de la qualité (la dernière choisie est proposée en premier), et le zapping garde cette qualité
 - [x] Groupes de chaînes en haut (Favoris, Récents, Toutes, catégories), ◀ ▶ d'émission en émission à la télécommande, glisser au doigt / à la souris, boutons ‹ 1 h · Maintenant · 1 h ›
+
+**Rappels**
+- [x] Appui long sur une émission du guide TV : « Me rappeler à 16:00 », « Basculer sur la chaîne », ou « Revoir » (replay) pour une émission terminée
+- [x] ⏰ sur les émissions avec rappel ; à l'heure, bandeau « Ça commence » par-dessus l'écran (même pendant une autre chaîne) avec « Regarder » / « Ignorer »
+- [x] Android : notification 2 minutes avant, même appli fermée (autorisation demandée au premier rappel)
 
 **Replay** (si le fournisseur garde des archives ; sinon le menu n'apparaît pas)
 - [x] Menu **Replay** : chaîne → jour (Aujourd'hui, Hier…) → émission ; « Depuis le début » pour l'émission en cours

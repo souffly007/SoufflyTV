@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Rappels du guide TV : notification à l'heure de l'émission -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Selon l'APK : « tv » exige Android TV, « mobile » exige un écran tactile -->
     <uses-feature android:name="android.software.leanback" android:required="${leanbackRequired}" />
@@ -30,5 +32,9 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".platform.ReminderReceiver"
+            android:exported="false" />
     </application>
 </manifest>

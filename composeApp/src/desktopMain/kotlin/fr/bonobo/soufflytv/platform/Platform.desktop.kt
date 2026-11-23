@@ -182,3 +182,8 @@ actual fun rememberUrlOpener(): (url: String) -> Boolean = remember {
         }.isSuccess
     }
 }
+
+/** Ordinateur : le rappel s'affiche dans la fenêtre de SoufflyTV (si elle est ouverte). */
+actual fun scheduleReminderNotification(reminder: fr.bonobo.soufflytv.data.Reminder) = Unit
+
+actual fun cancelReminderNotification(reminder: fr.bonobo.soufflytv.data.Reminder) = Unit
