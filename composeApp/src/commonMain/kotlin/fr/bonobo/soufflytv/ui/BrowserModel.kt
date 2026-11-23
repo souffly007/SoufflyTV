@@ -4,9 +4,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import fr.bonobo.soufflytv.data.ChannelGroup
 import fr.bonobo.soufflytv.data.HOUR_MS
+import fr.bonobo.soufflytv.data.groupVariants
 import fr.bonobo.soufflytv.data.IptvProvider
 import fr.bonobo.soufflytv.data.LibraryEntry
 import fr.bonobo.soufflytv.data.LibraryStore
@@ -20,6 +23,8 @@ import fr.bonobo.soufflytv.model.MovieInfo
 import fr.bonobo.soufflytv.model.Section
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -34,7 +39,10 @@ const val RECENTS = "__recent__"
 const val NOW_ON = "__now__"
 
 /** Pages en plus des rubriques : Ma liste, Historique, Recherche. */
-enum class ExtraPage { MY_LIST, HISTORY, SEARCH }
+enum class ExtraPage { MY_LIST, HISTORY, SEARCH, GUIDE }
+
+/** Guide TV : émission choisie (focus ou toucher) ; [start] à null = la chaîne elle-même. */
+data class GuideSelection(val groupKey: String, val start: Long?)
 
 /** Résultats d'une recherche dans tout le compte. */
 data class SearchResults(val live: List<Channel>, val movies: List<Channel>, val series: List<Channel>) {
@@ -123,6 +131,70 @@ class BrowserModel(
     /** Recherche : texte tapé et derniers résultats, gardés au retour d'une fiche ou du lecteur. */
     var searchText by mutableStateOf("")
     var searchResults by mutableStateOf<SearchResults?>(null)
+
+    // ---------- Guide TV (grille) ----------
+
+    /** Groupes de chaînes proposés en haut du guide (Favoris, Récents, Toutes, puis ceux du fournisseur). */
+    var guideCategories by mutableStateOf<List<Category>>(emptyList())
+        private set
+    var guideCategory by mutableStateOf<Category?>(null)
+        private set
+    /** Lignes du guide : une par chaîne, ses versions SD / HD / UHD regroupées. */
+    var guideGroups by mutableStateOf<List<ChannelGroup>>(emptyList())
+        private set
+    var guideLoading by mutableStateOf(false)
+        private set
+    var guideError by mutableStateOf<String?>(null)
+        private set
+    /** Heure au bord gauche de la grille (0 = pas encore placée). */
+    var guideViewStart by mutableLongStateOf(0L)
+    /** Émission sélectionnée : présentée en haut ; au retour du lecteur, le focus y revient. */
+    var guideSelection by mutableStateOf<GuideSelection?>(null)
+    val guideListState = LazyListState()
+    private var guideJob: Job? = null
+    private var guideStarted = false
+
+    /** À l'ouverture de la page : guide complet demandé, groupes chargés (une seule fois). */
+    fun prepareGuide() {
+        ensureEpg(force = true)
+        if (guideStarted) return
+        guideStarted = true
+        scope.launch {
+            guideLoading = true
+            val groups = safely { groupsFor(Section.LIVE) }
+            if (groups == null) {
+                guideError = "Impossible de charger les groupes de chaînes"
+                guideLoading = false
+                guideStarted = false
+                return@launch
+            }
+            guideCategories = groups
+            // Favoris s'il y en a, sinon toutes les chaînes
+            val hasFavorites = library.favorites.any { it.sourceId == sourceId && it.channel.type == ItemType.LIVE }
+            selectGuideCategory(groups.first { it.id == if (hasFavorites) FAVORITES else ALL_CATEGORIES })
+        }
+    }
+
+    fun selectGuideCategory(category: Category) {
+        guideCategory = category
+        guideSelection = null
+        guideJob?.cancel()
+        guideJob = scope.launch {
+            guideLoading = true
+            guideError = null
+            try {
+                val list = channelsFor(Section.LIVE, category).filter { it.type == ItemType.LIVE }
+                guideGroups = withContext(Dispatchers.Default) { groupVariants(list) }
+                guideListState.scrollToItem(0)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                guideError = e.toUserMessage()
+                guideGroups = emptyList()
+            }
+            guideLoading = false
+        }
+    }
 
     /** TV en direct, grand écran : chaîne présentée (et lue en petit) dans l'aperçu au-dessus de la liste. */
     var previewChannel by mutableStateOf<Channel?>(null)
@@ -401,8 +473,9 @@ class BrowserModel(
     }
 
     /** Charge le guide complet en arrière-plan (une seule fois). */
-    fun ensureEpg() {
-        if (epgRequested || !provider.hasLocalEpg || !settings.value.epgInLists) return
+    fun ensureEpg(force: Boolean = false) {
+        // [force] : la page Guide TV le demande même si « programme dans les listes » est coupé
+        if (epgRequested || !provider.hasLocalEpg || (!force && !settings.value.epgInLists)) return
         epgRequested = true
         scope.launch {
             // 1. guide enregistré sur l'appareil : affiché tout de suite

@@ -40,6 +40,8 @@ data class Settings(
     val livePreview: Boolean = true,
     /** Serveur DNS utilisé pour joindre les sources (contourne le blocage par le DNS de la box). */
     val dns: DnsMode = DnsMode.SYSTEM,
+    /** Guide TV : dernière qualité choisie (SD, HD, FHD, UHD…), proposée en premier la fois suivante. */
+    val preferredQuality: String = "",
 )
 
 /**

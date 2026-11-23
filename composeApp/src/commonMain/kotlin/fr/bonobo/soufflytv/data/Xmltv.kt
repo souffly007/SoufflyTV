@@ -187,9 +187,9 @@ fun formatDuration(ms: Long): String {
 
 // ---------- Même chaîne, plusieurs versions (SD / HD / FHD / 4K…) ----------
 
-private val COUNTRY_PREFIX = Regex("""^[\s\[(|#*■•►▶★]*[A-Za-z]{2,3}\s*[:|\])\-–■•►▶★]+\s*""")
-private val BRACKETS = Regex("""[(\[{][^)\]}]*[)\]}]""")
-private val QUALITY_WORDS = setOf(
+internal val COUNTRY_PREFIX = Regex("""^[\s\[(|#*■•►▶★]*[A-Za-z]{2,3}\s*[:|\])\-–■•►▶★]+\s*""")
+internal val BRACKETS = Regex("""[(\[{][^)\]}]*[)\]}]""")
+internal val QUALITY_WORDS = setOf(
     "sd", "hd", "fhd", "uhd", "qhd", "hq", "lq", "4k", "8k", "hdr", "hdr10", "dolby", "vision",
     "hevc", "h264", "h265", "x264", "x265", "50fps", "60fps", "fps", "raw", "backup", "vip",
     "multi", "multisub", "vf", "vo", "vostfr", "low", "high", "plus", "full", "direct", "live",

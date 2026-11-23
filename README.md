@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.9.1 && git push origin v0.9.1
+git tag v0.9.2 && git push origin v0.9.2
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -178,14 +178,19 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] Guide **partagé entre les versions** d'une même chaîne (TF1 SD / HD / FHD / 4K…)
 
 **Interface**
-- [x] **Smartphone** façon maquette : en-tête (logo, recherche, compte), barre du bas Accueil · TV Live · Films · Séries · Réglages,
+- [x] **Smartphone** façon maquette : en-tête (logo, recherche, compte), barre du bas Accueil · TV Live · Guide · Films · Séries · Réglages,
   carrousel « À la une » qui défile tout seul, grande carte **Continuer à regarder** (pourcentage, temps restant, Continuer / Reprendre du début), rangées avec « Tout voir »
-- [x] **Grand écran / TV** : barre latérale (Recherche, Accueil, TV en direct, Films, Séries, Filtres, Réglages, compte)
+- [x] **Grand écran / TV** : barre latérale (Recherche, Accueil, TV en direct, Guide TV, Films, Séries, Filtres, Réglages, compte)
 - [x] **Recherche** dans tout le compte (chaînes, films et séries) ; « Tout voir » ouvre l'historique complet
 
 **TV en direct**
 - [x] **Aperçu en direct** (TV) : la chaîne sous le curseur se lance en petit en haut de la liste, avec l'émission en cours, la suivante et la progression ; OK pour passer en plein écran (réglage pour le couper)
 - [x] **« En ce moment »** : ce qui passe maintenant sur toutes les chaînes, rangé par catégorie, avec le temps restant (quand un guide TV est chargé)
+
+**Guide TV en grille** (menu à part : barre latérale sur TV / PC, barre du bas sur smartphone)
+- [x] Grille horaire façon TiviMate : une ligne par chaîne, émissions sur la frise, ligne « maintenant », titre et résumé de l'émission choisie en haut
+- [x] Les versions d'une même chaîne (SD, HD, FHD, UHD/4K, HEVC…) sont **regroupées sur une seule ligne** ; au lancement, choix de la qualité (la dernière choisie est proposée en premier), et le zapping garde cette qualité
+- [x] Groupes de chaînes en haut (Favoris, Récents, Toutes, catégories), ◀ ▶ d'émission en émission à la télécommande, glisser au doigt / à la souris, boutons ‹ 1 h · Maintenant · 1 h ›
 
 **Réseau**
 - [x] **DNS sécurisé** (DNS-over-HTTPS) : Cloudflare, Quad9 ou Google au lieu du DNS de la box, pour joindre les serveurs bloqués par l'opérateur ;

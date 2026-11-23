@@ -28,6 +28,9 @@ expect fun nowMillis(): Long
 /** « 18:45 » dans le fuseau de l'appareil. */
 expect fun formatClock(epochMillis: Long): String
 
+/** Jour (heure locale) : « Aujourd'hui », « Demain », « Hier », sinon « mercredi 25 ». */
+expect fun formatDay(epochMillis: Long): String
+
 expect val isAndroid: Boolean
 
 /** APK « tv » : interface toujours en grand écran, pas de rotation ni d'image dans l'image. */

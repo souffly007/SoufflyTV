@@ -96,6 +96,19 @@ actual fun nowMillis(): Long = System.currentTimeMillis()
 actual fun formatClock(epochMillis: Long): String =
     clockFormatter.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
 
+private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d", java.util.Locale.FRENCH)
+
+actual fun formatDay(epochMillis: Long): String {
+    val zone = ZoneId.systemDefault()
+    val day = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
+    return when (java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(zone), day)) {
+        0L -> "Aujourd'hui"
+        1L -> "Demain"
+        -1L -> "Hier"
+        else -> dayFormatter.format(day)
+    }
+}
+
 @Composable
 actual fun FullscreenEffect(landscape: Boolean) = Unit
 

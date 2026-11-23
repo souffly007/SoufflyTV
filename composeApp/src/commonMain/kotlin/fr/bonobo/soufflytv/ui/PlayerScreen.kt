@@ -605,8 +605,9 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
                                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
                                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
                         )
-                        // Films et séries : gros boutons ronds au centre de l'image (−10 s, pause, +10 s)
-                        if (!live && status == PlayerStatus.Playing) {
+                        // Films et séries, écran tactile : gros boutons ronds au centre (−10 s, pause, +10 s).
+                        // Pas sur la TV : la télécommande a déjà la barre du bas et ◀ ▶ / OK.
+                        if (!live && status == PlayerStatus.Playing && !remoteNavigation()) {
                             CenterControls(
                                 controller,
                                 Modifier.align(Alignment.Center),
@@ -749,20 +750,30 @@ private fun PlayerTopBar(
                 )
             }
         }
-        if (controller.audioTracks.size > 1) {
+        // Films et séries : les menus restent visibles même avec une seule piste (on voit ce que contient le fichier)
+        val vod = channel.type != ItemType.LIVE
+        if (controller.audioTracks.size > 1 || vod) {
             TrackMenu(
                 icon = { Icon(AppIcons.Audio, contentDescription = "Piste audio", tint = Cm.Text) },
                 options = controller.audioTracks,
                 allowOff = false,
+                emptyLabel = "Aucune piste audio détectée",
                 onSelect = { id -> id?.let(controller::selectAudio) },
                 onOpen = onInteract,
             )
         }
-        if (controller.textTracks.isNotEmpty()) {
+        if (controller.textTracks.isNotEmpty() || vod) {
             TrackMenu(
-                icon = { Icon(AppIcons.Subtitles, contentDescription = "Sous-titres", tint = Cm.Text) },
+                icon = {
+                    Icon(
+                        AppIcons.Subtitles,
+                        contentDescription = "Sous-titres",
+                        tint = if (controller.textTracks.isEmpty()) Cm.TextMuted else Cm.Text,
+                    )
+                },
                 options = controller.textTracks,
                 allowOff = true,
+                emptyLabel = "Pas de sous-titres dans cette vidéo",
                 onSelect = controller::selectText,
                 onOpen = onInteract,
             )
@@ -803,6 +814,7 @@ private fun TrackMenu(
     allowOff: Boolean,
     onSelect: (String?) -> Unit,
     onOpen: () -> Unit,
+    emptyLabel: String? = null,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -819,6 +831,12 @@ private fun TrackMenu(
                         onSelect(null)
                         open = false
                     },
+                )
+            }
+            if (options.isEmpty() && emptyLabel != null) {
+                DropdownMenuItem(
+                    text = { Text("     $emptyLabel", color = Cm.TextMuted) },
+                    onClick = { open = false },
                 )
             }
             options.forEach { option ->

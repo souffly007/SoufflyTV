@@ -208,7 +208,7 @@ private fun PhoneHeader(
     }
 }
 
-/** Barre du bas, façon maquette : Accueil · TV Live · Films · Séries · Réglages. */
+/** Barre du bas, façon maquette : Accueil · TV Live · Guide · Films · Séries · Réglages. */
 @Composable
 private fun PhoneBottomBar(model: BrowserModel, onSettings: () -> Unit) {
     val extra = model.extraPage
@@ -223,6 +223,9 @@ private fun PhoneBottomBar(model: BrowserModel, onSettings: () -> Unit) {
                     Section.SERIES -> AppIcons.Library to "Séries"
                 }
                 BottomItem(icon, label, selected = !model.showHome && extra == null && model.section == s) { model.selectSection(s) }
+                if (s == Section.LIVE) {
+                    BottomItem(AppIcons.Guide, "Guide", selected = extra == ExtraPage.GUIDE) { model.openExtra(ExtraPage.GUIDE) }
+                }
             }
             // Ma liste et Historique : déjà là dans chaque rubrique (catégories ★ Favoris et Récents)
             BottomItem(AppIcons.Settings, "Réglages", selected = false, onClick = onSettings)
@@ -326,6 +329,9 @@ private fun SideRail(
                         Section.SERIES -> AppIcons.Library to "Séries"
                     }
                     RailItem(icon, label, expanded, selected = !model.showHome && extra == null && s == model.section) { model.selectSection(s) }
+                    if (s == Section.LIVE) {
+                        RailItem(AppIcons.Guide, "Guide TV", expanded, selected = extra == ExtraPage.GUIDE) { model.openExtra(ExtraPage.GUIDE) }
+                    }
                 }
             }
             RailItem(
