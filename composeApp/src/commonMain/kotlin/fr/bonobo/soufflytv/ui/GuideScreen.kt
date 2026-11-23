@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import fr.bonobo.soufflytv.AppState
 import fr.bonobo.soufflytv.data.ChannelGroup
 import fr.bonobo.soufflytv.data.ChannelVariant
@@ -705,7 +704,7 @@ private fun QualityChooser(
             delay(50)
         }
     }
-    Dialog(onDismissRequest = onDismiss) {
+    AppDialog(onDismissRequest = onDismiss) {
         Column(
             Modifier
                 .width(360.dp)

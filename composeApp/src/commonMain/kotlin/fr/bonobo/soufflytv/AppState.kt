@@ -51,6 +51,9 @@ sealed interface Screen {
 class AppState {
 
     private val scope = MainScope()
+
+    /** Ordinateur : boîtes de dialogue dessinées dans la fenêtre (Échap ferme celle du dessus). */
+    val dialogs = fr.bonobo.soufflytv.ui.DialogHost()
     private val repository = SourceRepository()
     private val http = createHttpClient()
 

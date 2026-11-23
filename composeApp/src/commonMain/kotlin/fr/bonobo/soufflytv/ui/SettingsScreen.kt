@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -263,10 +262,9 @@ fun SettingsScreen(state: AppState) {
     }
 
     if (confirmClear) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { confirmClear = false },
-            containerColor = Cm.SurfaceHigh,
-            title = { Text("Effacer l'historique ?") },
+            title = "Effacer l'historique ?",
             text = { Text("Les chaînes récentes et les positions de reprise seront supprimées. Les favoris sont conservés.", color = Cm.TextMuted) },
             confirmButton = {
                 TextButton(onClick = {

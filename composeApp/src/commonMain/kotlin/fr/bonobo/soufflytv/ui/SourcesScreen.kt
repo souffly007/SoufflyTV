@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -129,10 +128,9 @@ fun SourcesScreen(state: AppState) {
     }
 
     toDelete?.let { source ->
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { toDelete = null },
-            containerColor = Cm.SurfaceHigh,
-            title = { Text("Supprimer « ${source.name} » ?") },
+            title = "Supprimer « ${source.name} » ?",
             text = {
                 Text(
                     "Les identifiants, favoris et l'historique de cette source seront effacés de l'appareil.",

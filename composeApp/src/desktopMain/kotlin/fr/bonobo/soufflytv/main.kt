@@ -44,6 +44,8 @@ fun main() {
                 if (event.type != KeyEventType.KeyDown) {
                     false
                 } else when {
+                    // Échap : d'abord fermer une boîte de dialogue ouverte
+                    event.key == Key.Escape && state.dialogs.dismissTop() -> true
                     event.key == Key.Escape && windowState.placement == WindowPlacement.Fullscreen -> {
                         windowState.placement = WindowPlacement.Floating
                         true
