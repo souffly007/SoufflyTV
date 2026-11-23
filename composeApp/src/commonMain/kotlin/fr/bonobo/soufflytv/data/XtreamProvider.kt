@@ -49,6 +49,22 @@ class XtreamProvider(
     private val userPath = source.username.encodeURLParameter()
     private val passPath = source.password.encodeURLParameter()
 
+    /**
+     * Lien d'image : complet (http…), sans protocole (//hôte/…), chemin TMDB (/t/p/…),
+     * chemin du serveur (/images/…) ou hôte sans protocole (image.tmdb.org/…). null si vide.
+     */
+    private fun imageUrl(raw: String?): String? {
+        val v = raw?.trim()?.replace("\\/", "/")?.takeIf { it.isNotEmpty() && it != "null" } ?: return null
+        return when {
+            v.startsWith("http://", ignoreCase = true) || v.startsWith("https://", ignoreCase = true) -> v
+            v.startsWith("//") -> "https:$v"
+            v.startsWith("/t/p/") -> "https://image.tmdb.org$v"
+            v.startsWith("/") -> "$base$v"
+            Regex("^[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/").containsMatchIn(v) -> "https://$v"
+            else -> null
+        }
+    }
+
     /** Extension des flux live autorisée par le compte (ts ou m3u8). */
     private var liveExt: String? = null
 
@@ -141,7 +157,7 @@ class XtreamProvider(
                         Channel(
                             id = "xt-live-$id",
                             name = o.s("name") ?: "Chaîne $id",
-                            logo = o.s("stream_icon")?.takeIf { it.startsWith("http", ignoreCase = true) },
+                            logo = imageUrl(o.s("stream_icon")),
                             categoryId = o.s("category_id"),
                             stream = "$base/live/$userPath/$passPath/$id.$ext",
                             number = o.s("num")?.toIntOrNull(),
@@ -160,7 +176,7 @@ class XtreamProvider(
                         Channel(
                             id = "xt-movie-$id",
                             name = o.s("name") ?: "Film $id",
-                            logo = o.s("stream_icon")?.takeIf { it.startsWith("http", ignoreCase = true) },
+                            logo = imageUrl(o.s("stream_icon")),
                             categoryId = o.s("category_id"),
                             stream = "$base/movie/$userPath/$passPath/$id.$extension",
                             number = o.s("num")?.toIntOrNull(),
@@ -175,7 +191,7 @@ class XtreamProvider(
                         Channel(
                             id = "xt-series-$id",
                             name = o.s("name") ?: "Série $id",
-                            logo = o.s("cover")?.takeIf { it.startsWith("http", ignoreCase = true) },
+                            logo = imageUrl(o.s("cover")),
                             categoryId = o.s("category_id"),
                             stream = id,
                             number = o.s("num")?.toIntOrNull(),
@@ -213,7 +229,7 @@ class XtreamProvider(
             null
         }
         val info = json?.get("info") as? JsonObject ?: return basic
-        fun link(value: String?) = value?.takeIf { it.startsWith("http", ignoreCase = true) }
+        fun link(value: String?) = imageUrl(value)
         val backdrop = when (val b = info["backdrop_path"]) {
             is JsonArray -> (b.firstOrNull() as? JsonPrimitive)?.content
             is JsonPrimitive -> b.content
@@ -301,11 +317,11 @@ class XtreamProvider(
             is JsonArray -> (b.firstOrNull() as? JsonPrimitive)?.content
             is JsonPrimitive -> b.content
             else -> null
-        }?.takeIf { it.startsWith("http", ignoreCase = true) }
+        }.let(::imageUrl)
         val result = SeriesInfo(
             name = info?.s("name") ?: series.name,
             plot = info?.s("plot") ?: series.plot,
-            cover = info?.s("cover")?.takeIf { it.startsWith("http", ignoreCase = true) } ?: series.logo,
+            cover = imageUrl(info?.s("cover")) ?: series.logo,
             meta = meta,
             seasons = seasons,
             backdrop = backdrop,
@@ -326,7 +342,7 @@ class XtreamProvider(
         return season to Channel(
             id = "xt-ep-$id",
             name = o.s("title") ?: "Épisode ${number ?: ""}".trim(),
-            logo = info?.s("movie_image")?.takeIf { it.startsWith("http", ignoreCase = true) },
+            logo = imageUrl(info?.s("movie_image")),
             stream = "$base/series/$userPath/$passPath/$id.$ext",
             number = number,
             type = ItemType.EPISODE,

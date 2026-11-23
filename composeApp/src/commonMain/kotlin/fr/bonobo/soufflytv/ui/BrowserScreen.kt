@@ -1,5 +1,7 @@
 package fr.bonobo.soufflytv.ui
 
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.verticalScroll
@@ -89,6 +91,19 @@ import androidx.compose.runtime.DisposableEffect
 @Composable
 fun BrowserScreen(state: AppState, source: Source) {
     val model = remember(source) { state.browser(source) }
+    CompositionLocalProvider(LocalPosterFallback provides { item -> model.details(item).cover }) {
+        BrowserContent(state, source, model)
+    }
+}
+
+/**
+ * Affiche de remplacement d'un film / d'une série (celle de sa fiche), quand celle de la liste
+ * manque ou ne se charge pas.
+ */
+val LocalPosterFallback = staticCompositionLocalOf<(suspend (Channel) -> String?)?> { null }
+
+@Composable
+private fun BrowserContent(state: AppState, source: Source, model: BrowserModel) {
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = isTvBuild || maxWidth >= 720.dp
@@ -825,6 +840,19 @@ internal fun PosterCard(
     onLongClick: () -> Unit,
 ) {
     var loaded by remember(item.logo) { mutableStateOf(false) }
+    // Affiche de la liste absente ou illisible : on prend celle de la fiche du film / de la série
+    val fallback = LocalPosterFallback.current
+    var image by remember(item.id, item.logo) { mutableStateOf(item.logo) }
+    var failed by remember(item.id, item.logo) { mutableStateOf(item.logo == null) }
+    LaunchedEffect(item.id, failed) {
+        if (failed && fallback != null) {
+            val other = runCatching { fallback(item) }.getOrNull()
+            if (other != null && other != image) {
+                image = other
+                failed = false
+            }
+        }
+    }
     Column(
         Modifier
             .padding(4.dp)
@@ -847,13 +875,15 @@ internal fun PosterCard(
                     modifier = Modifier.padding(8.dp),
                 )
             }
-            if (item.logo != null) {
+            if (image != null) {
                 AsyncImage(
-                    model = item.logo,
+                    model = image,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                     onSuccess = { loaded = true },
+                    // une seule tentative de remplacement (l'affiche de la fiche)
+                    onError = { if (image == item.logo) failed = true },
                 )
             }
             if (favorite) {
