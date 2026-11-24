@@ -1,5 +1,7 @@
 package fr.bonobo.soufflytv.ui
 
+import fr.bonobo.soufflytv.Screen
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -176,6 +178,9 @@ fun SettingsScreen(state: AppState) {
     val reseau: @Composable () -> Unit = {
                 DnsSection(state)
     }
+    val filtres: @Composable () -> Unit = {
+                FiltersSection(state)
+    }
     val comptes: @Composable () -> Unit = {
                 AccountsBackupSection(state)
     }
@@ -198,6 +203,7 @@ fun SettingsScreen(state: AppState) {
     val rubrics = listOf(
         SettingsRubric("Lecture", AppIcons.Play, lecture),
         SettingsRubric("Affichage", AppIcons.Aspect, affichage),
+        SettingsRubric("Filtres", AppIcons.Filter, filtres),
         SettingsRubric("Réseau", AppIcons.Dns, reseau),
         SettingsRubric("Comptes", AppIcons.Library, comptes),
         SettingsRubric("Données", AppIcons.History, donnees),
@@ -377,6 +383,53 @@ private fun DnsSection(state: AppState) {
                         fontSize = 12.sp,
                     )
                 else -> Text("✓ Même réponse : pas de blocage par le DNS.", color = Cm.Success, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+/**
+ * Filtres : pour chaque compte et chaque rubrique (TV en direct, Films, Séries), choix des catégories
+ * à masquer. Avant dans la barre latérale ; ici, la barre reste plus courte sur TV et ordinateur.
+ */
+@Composable
+private fun FiltersSection(state: AppState) {
+    val sources by state.sources.collectAsState()
+    Text("Catégories affichées", color = Cm.Text, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 14.dp))
+    Text(
+        "Masque les catégories qui ne t'intéressent pas (langues, pays, adultes…) : elles disparaissent des listes, " +
+            "du guide TV et de la recherche.",
+        color = Cm.TextMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 14.dp),
+    )
+    if (sources.isEmpty()) {
+        Text("Aucun compte pour le moment.", color = Cm.TextMuted, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
+        return
+    }
+    sources.forEach { source ->
+        val sections = remember(source) { state.provider(source).sections }
+        Text(
+            source.name,
+            color = Cm.Cyan,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 6.dp),
+        )
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            sections.forEach { section ->
+                val hidden = state.library.hiddenIds(source.id, section).size
+                OutlinedButton(onClick = { state.navigate(Screen.ManageCategories(source, section)) }) {
+                    Icon(AppIcons.Filter, contentDescription = null, tint = Cm.Cyan, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        section.label + if (hidden > 0) " · $hidden masquée(s)" else "",
+                        color = Cm.Text,
+                    )
+                }
             }
         }
     }

@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.9.8 && git push origin v0.9.8
+git tag v0.9.9 && git push origin v0.9.9
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -180,7 +180,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 **Interface**
 - [x] **Smartphone** façon maquette : en-tête (logo, recherche, compte), barre du bas Accueil · TV Live · Guide · Replay · Films · Séries · Réglages,
   carrousel « À la une » qui défile tout seul, grande carte **Continuer à regarder** (pourcentage, temps restant, Continuer / Reprendre du début), rangées avec « Tout voir »
-- [x] **Grand écran / TV** : barre latérale (Recherche, Accueil, TV en direct, Guide TV, Replay, Films, Séries, Filtres, Réglages, compte)
+- [x] **Grand écran / TV** : barre latérale (Recherche, Accueil, TV en direct, Guide TV, Replay, Films, Séries, Réglages, compte) ; filtres des catégories dans Réglages → Filtres
 - [x] **Recherche** dans tout le compte (chaînes, films et séries) ; « Tout voir » ouvre l'historique complet
 
 **TV en direct**
@@ -193,6 +193,8 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] Groupes de chaînes en haut (Favoris, Récents, Toutes, catégories), ◀ ▶ d'émission en émission à la télécommande, glisser au doigt / à la souris, boutons ‹ 1 h · Maintenant · 1 h ›
 
 **Affiches** : liens d'images Xtream acceptés sous toutes leurs formes (//…, /t/p/… TMDB, chemin du serveur) ; si l'affiche de la liste manque, celle de la fiche du film la remplace
+
+**Mémoire** : les très grosses listes Xtream (dizaines de milliers d'entrées) sont lues directement en objets, une à la fois, sans copie en double par catégorie ; Android : grand tas mémoire (largeHeap)
 
 **Rappels**
 - [x] OK sur une émission à venir ou revoyable (ou appui long / touche Menu sur n'importe laquelle) : un seul menu avec le rappel, le replay et le choix de la qualité — « Me rappeler à 16:00 », « Basculer sur la chaîne », ou « Revoir » (replay) pour une émission terminée
@@ -234,7 +236,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] **Image dans l'image** (bouton ou touche Accueil), paysage automatique, écran toujours allumé
 - [x] **Reconnexion automatique** du direct (3 essais), mémoire tampon réglable
 
-**Réglages** (par rubriques sur grand écran : Lecture, Affichage, Réseau, Comptes, Données, À propos) : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
+**Réglages** (par rubriques sur grand écran : Lecture, Affichage, Filtres, Réseau, Comptes, Données, À propos) : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
 masquage des catégories adultes, effacement de l'historique.
 
 **À venir** : grille du guide TV sur plusieurs heures, contrôle parental par code.

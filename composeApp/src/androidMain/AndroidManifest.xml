@@ -9,7 +9,9 @@
     <uses-feature android:name="android.software.leanback" android:required="${leanbackRequired}" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="${touchscreenRequired}" />
 
+    <!-- largeHeap : les listes IPTV (dizaines de milliers de chaînes, films, séries) demandent de la mémoire -->
     <application
+        android:largeHeap="true"
         android:allowBackup="false"
         android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"

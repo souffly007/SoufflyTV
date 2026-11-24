@@ -113,7 +113,7 @@ private fun BrowserContent(state: AppState, source: Source, model: BrowserModel)
         val manage = { state.navigate(Screen.ManageCategories(source, model.section)) }
 
         if (wide) {
-            // Grand écran : barre latérale (Accueil, TV, Films, Séries, Filtres, Réglages, compte)
+            // Grand écran : barre latérale (Recherche, Accueil, TV, Guide, Replay, Films, Séries, Réglages, compte)
             // et, à droite, l'accueil de contenus ou la rubrique choisie
             val remote = remoteNavigation()
             Box(Modifier.fillMaxSize()) {
@@ -355,13 +355,7 @@ private fun SideRail(
                     }
                 }
             }
-            RailItem(
-                AppIcons.Filter,
-                if (model.hiddenCount > 0) "Filtres (${model.hiddenCount})" else "Filtres",
-                expanded,
-                selected = false,
-                onClick = onManage,
-            )
+            // Filtres des catégories : dans Réglages → Filtres (la barre reste plus courte)
             RailItem(AppIcons.Settings, "Réglages", expanded, selected = false, onClick = onSettings)
             Spacer(Modifier.height(6.dp))
             // Compte en cours : changer de compte
@@ -440,8 +434,29 @@ private fun CategoryPane(model: BrowserModel, modifier: Modifier) {
         onDispose { model.enterContent = null }
     }
 
+    // Télécommande : quand on revient dans la colonne (◀ depuis les chaînes / films, ▶ depuis la barre),
+    // le curseur se pose sur la catégorie choisie, pas sur celle qui se trouve en face.
+    val scope = rememberCoroutineScope()
+    val keyNavigation = remoteNavigation()
+    var paneFocused by remember { mutableStateOf(false) }
+
     LazyColumn(
-        modifier.onPreviewKeyEvent { event ->
+        modifier.onFocusChanged { state ->
+            val entering = state.hasFocus && !paneFocused
+            paneFocused = state.hasFocus
+            if (entering && keyNavigation && selectedId != null) {
+                scope.launch {
+                    withFrameNanos { } // laisse la catégorie atteinte signaler son focus
+                    if (selectedFocused) return@launch
+                    val item = model.categories.indexOfFirst { it.id == selectedId } + 1 // ligne 0 : en-tête
+                    if (item > 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == item }) {
+                        listState.scrollToItem((item - 3).coerceAtLeast(0))
+                        withFrameNanos { }
+                    }
+                    runCatching { selectedFocus.requestFocus() }
+                }
+            }
+        }.onPreviewKeyEvent { event ->
             event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight &&
                 model.enterPosters?.invoke() == true
         },

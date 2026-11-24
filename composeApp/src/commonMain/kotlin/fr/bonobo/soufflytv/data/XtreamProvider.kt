@@ -81,6 +81,13 @@ class XtreamProvider(
     private var xmltv: Map<String, List<Programme>>? = null
 
     private suspend fun api(action: String?, vararg extra: Pair<String, String>): JsonElement {
+        val text = apiText(action, *extra)
+        return withContext(Dispatchers.Default) { parseJsonOrNull(text) }
+            ?: throw IptvException("Réponse du serveur illisible (est-ce bien un serveur Xtream ?)")
+    }
+
+    /** Réponse brute de player_api.php (texte). */
+    private suspend fun apiText(action: String?, vararg extra: Pair<String, String>): String {
         val response = http.get("$base/player_api.php") {
             header("User-Agent", DEFAULT_USER_AGENT)
             parameter("username", source.username)
@@ -94,9 +101,7 @@ class XtreamProvider(
                 else "Serveur Xtream : erreur HTTP ${response.status.value}"
             )
         }
-        val text = response.bodyAsText()
-        return withContext(Dispatchers.Default) { parseJsonOrNull(text) }
-            ?: throw IptvException("Réponse du serveur illisible (est-ce bien un serveur Xtream ?)")
+        return response.bodyAsText()
     }
 
     private suspend fun ensureLogin() {
@@ -138,74 +143,84 @@ class XtreamProvider(
         return list
     }
 
+    /** Une seule grosse liste lue à la fois : évite de cumuler plusieurs pics de mémoire. */
+    private val listLock = Mutex()
+
     override suspend fun channels(section: Section, categoryId: String?): List<Channel> {
         val key = section to categoryId
         channelCache[key]?.let { return it }
-        ensureLogin()
-        val action = when (section) {
-            Section.LIVE -> "get_live_streams"
-            Section.MOVIES -> "get_vod_streams"
-            Section.SERIES -> "get_series"
+        // liste complète déjà en mémoire : une catégorie s'en déduit, sans nouvelle requête ni copie en double
+        if (categoryId != null) {
+            channelCache[section to null]?.let { all -> return all.filter { it.categoryId == categoryId } }
         }
-        val json = if (categoryId == null) api(action) else api(action, "category_id" to categoryId)
-        val ext = liveExt ?: "ts"
-        val list = withContext(Dispatchers.Default) {
-            json.asObjects().mapNotNull { o ->
-                when (section) {
-                    Section.LIVE -> {
-                        val id = o.s("stream_id") ?: return@mapNotNull null
-                        Channel(
-                            id = "xt-live-$id",
-                            name = o.s("name") ?: "Chaîne $id",
-                            logo = imageUrl(o.s("stream_icon")),
-                            categoryId = o.s("category_id"),
-                            stream = "$base/live/$userPath/$passPath/$id.$ext",
-                            number = o.s("num")?.toIntOrNull(),
-                            type = ItemType.LIVE,
-                            epgId = id,
-                            tvgId = o.s("epg_channel_id"),
-                            // Replay : tv_archive = 1, tv_archive_duration = nombre de jours gardés
-                            archiveDays = if (o.s("tv_archive") == "1") {
-                                (o.s("tv_archive_duration")?.toIntOrNull() ?: 1).coerceIn(1, 30)
-                            } else 0,
-                        )
-                    }
-                    Section.MOVIES -> {
-                        val id = o.s("stream_id") ?: return@mapNotNull null
-                        val extension = o.s("container_extension") ?: "mp4"
-                        Channel(
-                            id = "xt-movie-$id",
-                            name = o.s("name") ?: "Film $id",
-                            logo = imageUrl(o.s("stream_icon")),
-                            categoryId = o.s("category_id"),
-                            stream = "$base/movie/$userPath/$passPath/$id.$extension",
-                            number = o.s("num")?.toIntOrNull(),
-                            type = ItemType.MOVIE,
-                            plot = o.s("plot"),
-                            rating = o.s("rating"),
-                            added = o.s("added")?.toLongOrNull()?.takeIf { it > 0 }?.times(1000),
-                        )
-                    }
-                    Section.SERIES -> {
-                        val id = o.s("series_id") ?: return@mapNotNull null
-                        Channel(
-                            id = "xt-series-$id",
-                            name = o.s("name") ?: "Série $id",
-                            logo = imageUrl(o.s("cover")),
-                            categoryId = o.s("category_id"),
-                            stream = id,
-                            number = o.s("num")?.toIntOrNull(),
-                            type = ItemType.SERIES,
-                            plot = o.s("plot"),
-                            rating = o.s("rating"),
-                            added = o.s("last_modified")?.toLongOrNull()?.takeIf { it > 0 }?.times(1000),
-                        )
-                    }
-                }
+        return listLock.withLock {
+            channelCache[key]?.let { return@withLock it }
+            ensureLogin()
+            val action = when (section) {
+                Section.LIVE -> "get_live_streams"
+                Section.MOVIES -> "get_vod_streams"
+                Section.SERIES -> "get_series"
             }
+            val text = if (categoryId == null) apiText(action) else apiText(action, "category_id" to categoryId)
+            val ext = liveExt ?: "ts"
+            val list = withContext(Dispatchers.Default) {
+                val items = decodeXtItems(text)
+                    ?: parseJsonOrNull(text)?.asObjects()?.map { XtItem.from(it) }
+                    ?: throw IptvException("Réponse du serveur illisible (est-ce bien un serveur Xtream ?)")
+                items.mapNotNull { toChannel(it, section, ext) }
+            }
+            channelCache[key] = list
+            list
         }
-        channelCache[key] = list
-        return list
+    }
+
+    private fun toChannel(o: XtItem, section: Section, ext: String): Channel? = when (section) {
+        Section.LIVE -> o.streamId.clean()?.let { id ->
+            Channel(
+                id = "xt-live-$id",
+                name = o.name.clean() ?: "Chaîne $id",
+                logo = imageUrl(o.streamIcon.clean()),
+                categoryId = o.categoryId.clean(),
+                stream = "$base/live/$userPath/$passPath/$id.$ext",
+                number = o.num.clean()?.toIntOrNull(),
+                type = ItemType.LIVE,
+                epgId = id,
+                tvgId = o.epgChannelId.clean(),
+                // Replay : tv_archive = 1, tv_archive_duration = nombre de jours gardés
+                archiveDays = if (o.tvArchive.clean() == "1") {
+                    (o.tvArchiveDuration.clean()?.toIntOrNull() ?: 1).coerceIn(1, 30)
+                } else 0,
+            )
+        }
+        Section.MOVIES -> o.streamId.clean()?.let { id ->
+            val extension = o.containerExtension.clean() ?: "mp4"
+            Channel(
+                id = "xt-movie-$id",
+                name = o.name.clean() ?: "Film $id",
+                logo = imageUrl(o.streamIcon.clean()),
+                categoryId = o.categoryId.clean(),
+                stream = "$base/movie/$userPath/$passPath/$id.$extension",
+                number = o.num.clean()?.toIntOrNull(),
+                type = ItemType.MOVIE,
+                plot = o.plot.clean(),
+                rating = o.rating.clean(),
+                added = o.added.clean()?.toLongOrNull()?.takeIf { it > 0 }?.times(1000),
+            )
+        }
+        Section.SERIES -> o.seriesId.clean()?.let { id ->
+            Channel(
+                id = "xt-series-$id",
+                name = o.name.clean() ?: "Série $id",
+                logo = imageUrl(o.cover.clean()),
+                categoryId = o.categoryId.clean(),
+                stream = id,
+                number = o.num.clean()?.toIntOrNull(),
+                type = ItemType.SERIES,
+                plot = o.plot.clean(),
+                rating = o.rating.clean(),
+                added = o.lastModified.clean()?.toLongOrNull()?.takeIf { it > 0 }?.times(1000),
+            )
+        }
     }
 
     override suspend fun resolve(channel: Channel): StreamRequest =
