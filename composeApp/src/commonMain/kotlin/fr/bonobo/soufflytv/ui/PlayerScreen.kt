@@ -270,8 +270,12 @@ fun PlayerScreen(state: AppState, screen: Screen.Player) {
                 autoRetries = 0
                 if (!recorded) {
                     recorded = true
-                    // les replays ne vont pas dans « Récents » (ce ne sont pas des chaînes)
-                    if (!channel.isReplay) state.library.addRecent(source.id, channel)
+                    // les replays ne vont pas dans l'historique (ce ne sont pas des chaînes) ;
+                    // un épisode y met aussi sa série (c'est elle que l'historique affiche)
+                    if (!channel.isReplay) {
+                        state.library.addRecent(source.id, channel)
+                        channel.parentSeries?.let { state.library.addRecent(source.id, it) }
+                    }
                 }
             }
             reconnecting -> {

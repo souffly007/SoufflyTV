@@ -61,7 +61,7 @@ import kotlinx.coroutines.launch
 /**
  * Liste des chaînes posée sur la vidéo, façon TiviMate mais aux couleurs Souffly :
  *  - colonne des chaînes du groupe en cours, chaîne regardée en surbrillance ;
- *  - flèche gauche : colonne des groupes (Favoris, Récents, TV HD, CINEMA…) ;
+ *  - flèche gauche : colonne des groupes (Favoris, Historique, TV HD, CINEMA…) ;
  *  - OK sur une chaîne : elle se lance, la liste se referme ; la vidéo ne s'arrête jamais.
  */
 @Composable

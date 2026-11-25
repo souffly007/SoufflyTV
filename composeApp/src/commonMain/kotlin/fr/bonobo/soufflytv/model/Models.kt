@@ -95,6 +95,8 @@ data class Channel(
     val replayStart: Long? = null,
     val replayStop: Long? = null,
     val replayId: String? = null,
+    /** Épisode : la série dont il fait partie (pour l'historique, qui garde la série plutôt que l'épisode). */
+    val parentSeries: Channel? = null,
 )
 
 /** true pour une émission passée relue (replay) : elle se lit comme un film. */

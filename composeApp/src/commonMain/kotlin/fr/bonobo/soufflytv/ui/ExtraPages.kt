@@ -158,7 +158,10 @@ private fun MyListPage(state: AppState, source: Source, model: BrowserModel, mod
 @Composable
 private fun HistoryPage(state: AppState, source: Source, model: BrowserModel, modifier: Modifier) {
     val library = state.library
-    val entries = library.recents.filter { it.sourceId == source.id }
+    // les séries plutôt que chaque épisode vu (la série s'ouvre sur l'épisode où l'on s'est arrêté)
+    val entries = library.recents.filter {
+        it.sourceId == source.id && (model.sections.size == 1 || it.channel.type != ItemType.EPISODE)
+    }
     val (_, firstFocus) = rememberPageFocus(model, entries.isEmpty())
 
     Column(modifier) {

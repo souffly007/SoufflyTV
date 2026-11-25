@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -117,7 +118,19 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
             err != null -> ErrorBox(err, onRetry = { retry++ })
             current == null -> LoadingBox("Chargement des épisodes…")
             else -> {
-                val season = current.seasons[seasonIndex.coerceIn(0, current.seasons.lastIndex)]
+                // Où en est-on dans la série : épisode commencé, ou suivant du dernier vu
+                val resume = resumeTarget(current, source.id, state)
+                // Ouverture de la série (historique, favoris, liste, retour du lecteur) : on se place
+                // directement sur cet épisode, une fois par affichage de l'écran
+                val positioned = remember(series.id) { BooleanArray(1) }
+                val autoSeason = if (resume != null && !positioned[0]) {
+                    positioned[0] = true
+                    state.focusMemory[seasonKey] = resume.seasonIndex.toString()
+                    state.focusMemory[episodeKey] = resume.episode.id
+                    resume.seasonIndex
+                } else null
+                if (autoSeason != null) SideEffect { seasonIndex = autoSeason }
+                val season = current.seasons[(autoSeason ?: seasonIndex).coerceIn(0, current.seasons.lastIndex)]
                 val rememberedId = state.focusMemory[episodeKey]
                 val targetIndex = season.episodes.indexOfFirst { it.id == rememberedId }.coerceAtLeast(0)
                 // index de la première ligne d'épisode dans la liste
@@ -127,15 +140,13 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                     else -> 2
                 }
 
-                // Où en est-on dans la série : épisode commencé, ou suivant du dernier vu
-                val resume = resumeTarget(current, source.id, state)
                 fun playEpisode(target: ResumeTarget, fromStart: Boolean) {
                     val targetSeason = current.seasons[target.seasonIndex]
                     seasonIndex = target.seasonIndex
                     state.focusMemory[seasonKey] = target.seasonIndex.toString()
                     state.focusMemory[episodeKey] = target.episode.id
                     if (fromStart) state.library.setPosition("${source.id}|${target.episode.id}", 0)
-                    state.play(source, withCover(targetSeason.episodes, current.cover), target.episodeIndex)
+                    state.play(source, withCover(targetSeason.episodes, current.cover, series), target.episodeIndex)
                 }
 
                 // Première arrivée sur la série : le focus va sur « Reprendre » ;
@@ -150,6 +161,14 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                         isFocused = { episodeFocused },
                         prepare = { listState.scrollToItem((firstEpisodeItem + targetIndex - 1).coerceAtLeast(0)) },
                     )
+                }
+
+                // Au doigt : la liste défile jusqu'à l'épisode (à la télécommande, le curseur s'y pose)
+                val keyNavigation = remoteNavigation()
+                LaunchedEffect(series.id, season.number, rememberedId) {
+                    if (!keyNavigation && rememberedId != null && targetIndex > 0) {
+                        listState.scrollToItem((firstEpisodeItem + targetIndex - 1).coerceAtLeast(0))
+                    }
                 }
 
                 val resumeButtons: @Composable (Boolean) -> Unit = { stacked ->
@@ -201,7 +220,7 @@ fun SeriesScreen(state: AppState, source: Source, series: Channel) {
                     ) {
                         state.focusMemory[seasonKey] = seasonIndex.toString()
                         state.focusMemory[episodeKey] = episode.id
-                        state.play(source, withCover(season.episodes, current.cover), i)
+                        state.play(source, withCover(season.episodes, current.cover, series), i)
                     }
                 }
 
@@ -487,5 +506,10 @@ private fun ResumeButtons(
 }
 
 /** Épisodes sans vignette : l'affiche de la série (pour « Continuer à regarder » sur l'accueil). */
-private fun withCover(episodes: List<Channel>, cover: String?): List<Channel> =
-    if (cover == null) episodes else episodes.map { if (it.logo == null) it.copy(logo = cover) else it }
+/** Épisodes prêts à lire : image de la série s'ils n'en ont pas, et la série elle-même (pour l'historique). */
+private fun withCover(episodes: List<Channel>, cover: String?, series: Channel): List<Channel> {
+    val parent = series.copy(parentSeries = null)
+    return episodes.map { ep ->
+        ep.copy(logo = ep.logo ?: cover, parentSeries = parent)
+    }
+}

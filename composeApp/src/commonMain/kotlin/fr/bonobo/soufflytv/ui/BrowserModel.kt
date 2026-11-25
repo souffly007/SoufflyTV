@@ -134,7 +134,7 @@ class BrowserModel(
 
     // ---------- Guide TV (grille) ----------
 
-    /** Groupes de chaînes proposés en haut du guide (Favoris, Récents, Toutes, puis ceux du fournisseur). */
+    /** Groupes de chaînes proposés en haut du guide (Favoris, Historique, Toutes, puis ceux du fournisseur). */
     var guideCategories by mutableStateOf<List<Category>>(emptyList())
         private set
     var guideCategory by mutableStateOf<Category?>(null)
@@ -353,7 +353,7 @@ class BrowserModel(
     private var categoriesToken = 0
     private var channelsToken = 0
 
-    /** Catégories affichées : Favoris, Récents, Tout, puis celles du fournisseur (filtre adulte appliqué). */
+    /** Catégories affichées : Favoris, Historique, Tout, puis celles du fournisseur (filtre adulte appliqué). */
     val categories: List<Category>
         get() {
             if (!loadedOnce) return emptyList()
@@ -367,7 +367,7 @@ class BrowserModel(
                 (settings.value.hideAdult && it.id in adultIds) || it.id in hiddenIds
             }
             val nowOn = if (section == Section.LIVE && provider.hasLocalEpg) listOf(Category(NOW_ON, "En ce moment")) else emptyList()
-            return nowOn + listOf(Category(FAVORITES, "Favoris"), Category(RECENTS, "Récents"), Category(ALL_CATEGORIES, all)) + list
+            return nowOn + listOf(Category(FAVORITES, "Favoris"), Category(RECENTS, "Historique"), Category(ALL_CATEGORIES, all)) + list
         }
 
     val providerCategoryCount: Int get() = categories.count { it.id !in setOf(NOW_ON, FAVORITES, RECENTS, ALL_CATEGORIES) }
@@ -477,7 +477,7 @@ class BrowserModel(
     fun visibleChannels(): List<Channel> {
         val base = when (selected?.id) {
             FAVORITES -> fromLibrary(library.favorites, section)
-            RECENTS -> fromLibrary(library.recents, section)
+            RECENTS -> fromLibrary(library.recents, section, history = true)
             else -> channels
         }
         // Favoris et récents : toujours affichés ; ailleurs, on retire les catégories masquées
@@ -494,18 +494,21 @@ class BrowserModel(
         return if (q.isEmpty()) adultFiltered else adultFiltered.filter { it.name.contains(q, ignoreCase = true) }
     }
 
-    private fun fromLibrary(entries: List<LibraryEntry>, target: Section): List<Channel> {
+    private fun fromLibrary(entries: List<LibraryEntry>, target: Section, history: Boolean = false): List<Channel> {
         // Une source à rubrique unique (M3U) garde tout ; sinon on trie par rubrique
         val singleSection = sections.size == 1
-        return entries.filter { it.sourceId == sourceId && (singleSection || it.channel.type in target.types) }
-            .map { it.channel }
+        return entries.filter {
+            it.sourceId == sourceId && (singleSection || it.channel.type in target.types) &&
+                // Historique des séries : la série (qui s'ouvre sur le bon épisode), pas chaque épisode vu
+                (!history || singleSection || it.channel.type != ItemType.EPISODE)
+        }.map { it.channel }
     }
 
     // ---------- Liste des chaînes du lecteur (façon TiviMate) ----------
 
     private fun specialCategories(target: Section) = listOf(
         Category(FAVORITES, "Favoris"),
-        Category(RECENTS, "Récents"),
+        Category(RECENTS, "Historique"),
         Category(
             ALL_CATEGORIES,
             when (target) {
@@ -527,7 +530,7 @@ class BrowserModel(
     /** Chaînes d'un groupe pour la liste du lecteur, sans changer ce qu'affiche l'écran des catégories. */
     suspend fun channelsFor(target: Section, category: Category): List<Channel> {
         if (category.id == FAVORITES) return fromLibrary(library.favorites, target)
-        if (category.id == RECENTS) return fromLibrary(library.recents, target)
+        if (category.id == RECENTS) return fromLibrary(library.recents, target, history = true)
         val base = provider.channels(target, category.id.takeUnless { it == ALL_CATEGORIES })
         val all = provider.categories(target)
         val adult = if (settings.value.hideAdult) all.filter { isAdultCategory(it.name) }.map { it.id }.toSet() else emptySet()

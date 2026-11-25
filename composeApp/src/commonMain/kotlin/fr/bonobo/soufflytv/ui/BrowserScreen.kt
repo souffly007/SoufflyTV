@@ -245,7 +245,7 @@ private fun PhoneBottomBar(model: BrowserModel, onSettings: () -> Unit) {
                     }
                 }
             }
-            // Ma liste et Historique : déjà là dans chaque rubrique (catégories ★ Favoris et Récents)
+            // Ma liste et Historique : déjà là dans chaque rubrique (catégories ★ Favoris et Historique)
             BottomItem(AppIcons.Settings, "Réglages", selected = false, onClick = onSettings)
         }
     }
