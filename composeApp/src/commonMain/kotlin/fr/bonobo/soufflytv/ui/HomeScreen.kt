@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -72,10 +73,13 @@ fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Mod
     val library = state.library
     val playable = setOf(ItemType.MOVIE, ItemType.EPISODE)
     // Une carte par film et une seule par série (son dernier épisode regardé, s'il est commencé)
+    val knownSeries = (library.recents + library.favorites)
+        .filter { it.sourceId == source.id && it.channel.type == ItemType.SERIES }
+        .map { it.channel }
     val continueItems = library.recents
         .filter { it.sourceId == source.id && it.channel.type in playable }
-        .map { it.channel }
-        .distinctBy { item -> item.parentSeries?.let { "series|${it.id}" } ?: item.id }
+        .map { withSeries(it.channel, knownSeries) }
+        .distinctBy(::continueKey)
         .filter { (library.position("${source.id}|${it.id}") ?: 0L) > 30_000 }
         .take(20)
     // Carte choisie : la fiche de la série (sur le bon épisode) ou celle du film, comme dans l'Historique
@@ -396,11 +400,8 @@ private fun PosterRow(
 @Composable
 private fun ContinueCard(item: Channel, progress: Float?, position: Long?, modifier: Modifier, onClick: () -> Unit) {
     Column(Modifier.width(250.dp).padding(4.dp).then(modifier).tvClickable(onClick = onClick).padding(6.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)).background(Cm.SurfaceHigher)) {
-            Icon(AppIcons.Play, contentDescription = null, tint = Cm.Cyan.copy(alpha = 0.5f), modifier = Modifier.size(36.dp).align(Alignment.Center))
-            if (item.logo != null) {
-                AsyncImage(item.logo, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            }
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp))) {
+            ContinueImage(item, Modifier.fillMaxSize())
             if (progress != null) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(5.dp).background(Color.Black.copy(alpha = 0.6f))) {
                     Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(Cm.Cyan))
@@ -408,10 +409,10 @@ private fun ContinueCard(item: Channel, progress: Float?, position: Long?, modif
             }
         }
         Spacer(Modifier.height(6.dp))
-        Text(continueTitle(item), color = Cm.Text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(continueTitle(item), color = Cm.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(continueKind(item), color = Cm.Cyan, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             listOfNotNull(
-                continueKind(item),
                 progress?.let { "${(it * 100).toInt()} %" },
                 position?.let { "arrêté à ${formatDuration(it)}" },
             ).joinToString(" · "),
@@ -435,22 +436,71 @@ internal fun LiveCard(item: Channel, modifier: Modifier, onClick: () -> Unit) {
     }
 }
 
-/** Titre d'une carte « Continuer à regarder » : le nom de la série pour un épisode, sinon le film. */
-internal fun continueTitle(item: Channel): String = item.parentSeries?.name ?: item.name
+/**
+ * Image d'une carte « Continuer à regarder ». Pour une série : son affiche à gauche,
+ * devant l'image de l'épisode assombrie (on voit la série, pas l'épisode).
+ */
+@Composable
+internal fun ContinueImage(item: Channel, modifier: Modifier) {
+    val poster = item.parentSeries?.logo
+    Box(modifier.background(Cm.SurfaceHigher)) {
+        Icon(AppIcons.Play, contentDescription = null, tint = Cm.Cyan.copy(alpha = 0.5f), modifier = Modifier.size(36.dp).align(Alignment.Center))
+        if (item.logo != null) {
+            AsyncImage(
+                item.logo,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().then(if (poster != null) Modifier.alpha(0.35f) else Modifier),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        if (poster != null) {
+            AsyncImage(
+                poster,
+                contentDescription = null,
+                modifier = Modifier.fillMaxHeight().aspectRatio(2f / 3f).align(Alignment.CenterStart),
+                contentScale = ContentScale.Crop,
+            )
+        }
+    }
+}
 
-/** « SÉRIE · S2 É5 », « ÉPISODE » (ancien historique) ou « FILM ». */
-internal fun continueKind(item: Channel): String = when {
-    item.parentSeries != null -> listOfNotNull("SÉRIE", episodeCode(item)).joinToString(" · ")
-    item.type == ItemType.EPISODE -> "ÉPISODE"
-    else -> "FILM"
+/** Titre d'une carte « Continuer à regarder » : le nom de la série pour un épisode, sinon le film. */
+internal fun continueTitle(item: Channel): String = item.parentSeries?.name
+    ?: if (item.type == ItemType.EPISODE) seriesPart(item.name) else item.name
+
+/** « S2 · Épisode 5 en cours » pour une série, « Film » pour un film. */
+internal fun continueKind(item: Channel): String {
+    if (item.type != ItemType.EPISODE) return "Film"
+    val m = EPISODE_CODE.find(item.name)
+    return when {
+        m != null -> "S${m.groupValues[1].toInt()} · Épisode ${m.groupValues[2].toInt()} en cours"
+        item.number != null -> "Épisode ${item.number} en cours"
+        else -> "Épisode en cours"
+    }
 }
 
 private val EPISODE_CODE = Regex("""(?<![A-Za-z])[Ss](\d{1,2})\s*[ .x_-]?\s*[EeÉé](\d{1,3})(?!\d)""")
 
-/** Saison et épisode tirés du nom (« S02E05 », « S2 E5 »…), sinon le numéro d'épisode seul. */
-internal fun episodeCode(item: Channel): String? {
-    EPISODE_CODE.find(item.name)?.let { m ->
-        return "S${m.groupValues[1].toInt()} É${m.groupValues[2].toInt()}"
-    }
-    return item.number?.let { "É$it" }
+/** Nom d'un épisode sans « S02E05 » et ce qui suit : en général, le nom de la série. */
+private fun seriesPart(name: String): String {
+    val m = EPISODE_CODE.find(name) ?: return name
+    return name.substring(0, m.range.first).trim().trimEnd('-', '–', ':', '|').trim().ifEmpty { name }
+}
+
+/**
+ * Épisode d'un ancien historique (avant que l'épisode garde sa série) :
+ * la série retrouvée par son nom parmi les séries récentes ou de Ma liste.
+ */
+internal fun withSeries(item: Channel, series: List<Channel>): Channel {
+    if (item.type != ItemType.EPISODE || item.parentSeries != null) return item
+    val name = item.name.lowercase()
+    val match = series.filter { it.name.isNotBlank() && name.startsWith(it.name.lowercase()) }.maxByOrNull { it.name.length }
+    return if (match != null) item.copy(parentSeries = match.copy(parentSeries = null)) else item
+}
+
+/** Une seule carte par série (son dernier épisode), une par film. */
+internal fun continueKey(item: Channel): String = when {
+    item.parentSeries != null -> "series|${item.parentSeries.id}"
+    item.type == ItemType.EPISODE -> "name|" + seriesPart(item.name).lowercase()
+    else -> item.id
 }

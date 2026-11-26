@@ -221,9 +221,7 @@ internal fun PhoneContinueCard(
                 Modifier.width(150.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(Cm.SurfaceHigher)
                     .tvClickable(onClick = onOpen),
             ) {
-                if (item.logo != null) {
-                    AsyncImage(item.logo, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                }
+                ContinueImage(item, Modifier.fillMaxSize())
                 progress?.let {
                     Text(
                         "${(it * 100).toInt()} %",
