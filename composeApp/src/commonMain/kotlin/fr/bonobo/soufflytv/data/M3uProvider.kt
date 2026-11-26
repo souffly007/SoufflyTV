@@ -107,7 +107,7 @@ class M3uProvider(
     /** Télécharge le guide s'il manque ou a plus de 6 h, puis l'enregistre. */
     override suspend fun preloadEpg(): Unit = epgMutex.withLock {
         val now = nowMillis()
-        if (epgByChannel != null && now - epgSavedAt < EpgCache.REFRESH_MS) return@withLock
+        if (epgByChannel != null && now - epgSavedAt < EpgCache.refreshMs) return@withLock
         val channels = load().channels
         val urls = epgUrls()
         if (urls.isEmpty()) {
@@ -146,7 +146,7 @@ class M3uProvider(
             EpgCache.save(source.id, now, map)
         } else {
             if (epgByChannel == null) epgByChannel = emptyMap()
-            epgSavedAt = now - EpgCache.REFRESH_MS + 30 * MINUTE_MS // nouvel essai dans 30 min
+            epgSavedAt = now - EpgCache.refreshMs + 30 * MINUTE_MS // nouvel essai dans 30 min
         }
         Unit
     }

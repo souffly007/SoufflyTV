@@ -1,5 +1,7 @@
 package fr.bonobo.soufflytv.ui
 
+import fr.bonobo.soufflytv.data.ParentalLock
+import fr.bonobo.soufflytv.data.ParentalControl
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.getValue
@@ -58,7 +60,14 @@ class BrowserModel(
     private val sourceId: String,
     private val library: LibraryStore,
     private val settings: SettingsStore,
+    private val parental: ParentalControl,
 ) {
+    /** Contenus adultes cachés : réglage « masquer », ou contrôle parental pas encore déverrouillé. */
+    private fun adultHidden(): Boolean = settings.value.hideAdult || parental.locks(ParentalLock.ADULT)
+
+    /** Catégorie adulte protégée par le code PIN (affichée avec un cadenas). */
+    fun isLocked(category: Category): Boolean = category.id in adultIds && parental.locks(ParentalLock.ADULT)
+
     val sections: List<Section> = provider.sections
 
     var section by mutableStateOf(sections.first())
@@ -409,6 +418,15 @@ class BrowserModel(
     }
 
     fun select(category: Category) {
+        // catégorie adulte protégée : code PIN d'abord
+        if (isLocked(category)) {
+            parental.guard(ParentalLock.ADULT, "Ouvrir « ${category.name} »") { openCategory(category) }
+            return
+        }
+        openCategory(category)
+    }
+
+    private fun openCategory(category: Category) {
         val changed = selected?.id != category.id
         selected = category
         showChannels = true
@@ -483,7 +501,7 @@ class BrowserModel(
         // Favoris et récents : toujours affichés ; ailleurs, on retire les catégories masquées
         val special = selected?.id == FAVORITES || selected?.id == RECENTS
         val hiddenIds = if (special) emptySet() else library.hiddenIds(sourceId, section)
-        val adult = settings.value.hideAdult && adultIds.isNotEmpty()
+        val adult = adultHidden() && adultIds.isNotEmpty()
         val adultFiltered = if (adult || hiddenIds.isNotEmpty()) {
             base.filterNot { ch ->
                 val cat = ch.categoryId ?: return@filterNot false
@@ -523,7 +541,7 @@ class BrowserModel(
     suspend fun groupsFor(target: Section): List<Category> {
         val list = provider.categories(target)
         val hidden = library.hiddenIds(sourceId, target)
-        val hideAdult = settings.value.hideAdult
+        val hideAdult = adultHidden()
         return specialCategories(target) + list.filterNot { (hideAdult && isAdultCategory(it.name)) || it.id in hidden }
     }
 
@@ -533,7 +551,7 @@ class BrowserModel(
         if (category.id == RECENTS) return fromLibrary(library.recents, target, history = true)
         val base = provider.channels(target, category.id.takeUnless { it == ALL_CATEGORIES })
         val all = provider.categories(target)
-        val adult = if (settings.value.hideAdult) all.filter { isAdultCategory(it.name) }.map { it.id }.toSet() else emptySet()
+        val adult = if (adultHidden()) all.filter { isAdultCategory(it.name) }.map { it.id }.toSet() else emptySet()
         val hidden = library.hiddenIds(sourceId, target)
         if (adult.isEmpty() && hidden.isEmpty()) return base
         return base.filterNot { ch ->

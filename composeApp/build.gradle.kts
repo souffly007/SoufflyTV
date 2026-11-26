@@ -3,8 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 // Version de SoufflyTV, la même pour Android et pour les installeurs PC (à changer ici seulement)
-val appVersion = "0.9.10"
-val appVersionCode = 37
+val appVersion = "0.9.11"
+val appVersionCode = 38
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)

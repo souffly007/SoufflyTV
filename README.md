@@ -114,7 +114,7 @@ l'utilisateur, sans droits administrateur, avec raccourci et entrée dans le men
 
 **Sans PC Windows : GitHub Actions** (`.github/workflows/release.yml`)
 ```bash
-git tag v0.9.10 && git push origin v0.9.10
+git tag v0.9.11 && git push origin v0.9.11
 ```
 → une « Release » GitHub avec `SoufflyTV-x.y.z.msi`, `SoufflyTV-x.y.z.exe`, et les APK TV + smartphone
 (signés si les secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` sont définis).
@@ -198,6 +198,10 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 
 **Historique** (anciennement « Récents ») : pour les séries, la série elle-même plutôt que chaque épisode vu ; en l'ouvrant, on arrive directement sur l'épisode où l'on s'est arrêté (saison et épisode)
 
+**Contrôle parental** : code à 4 chiffres (pavé à l'écran ou touches chiffres), qui protège au choix les catégories adultes (cadenas ; cachées ailleurs tant que c'est verrouillé), les réglages et les comptes ; une fois saisi, rien n'est redemandé jusqu'à la fermeture de l'appli. Seule l'empreinte du code est enregistrée.
+
+**Réglages ajoutés** : taille du texte (Petite → Très grande) ; guide TV : décalage horaire (par 30 min), mise à jour toutes les 6 / 12 / 24 h, « Mettre à jour maintenant » ; rappels 1, 2, 5 ou 10 min avant ; **sauvegarde complète** chiffrée (comptes + favoris, historique et reprises, filtres, rappels, réglages)
+
 **Rappels**
 - [x] OK sur une émission à venir ou revoyable (ou appui long / touche Menu sur n'importe laquelle) : un seul menu avec le rappel, le replay et le choix de la qualité — « Me rappeler à 16:00 », « Basculer sur la chaîne », ou « Revoir » (replay) pour une émission terminée
 - [x] ⏰ sur les émissions avec rappel ; à l'heure, bandeau « Ça commence » par-dessus l'écran (même pendant une autre chaîne) avec « Regarder » / « Ignorer »
@@ -238,7 +242,7 @@ Retour depuis une rubrique ramène à l'Accueil. Le focus revient toujours sur l
 - [x] **Image dans l'image** (bouton ou touche Accueil), paysage automatique, écran toujours allumé
 - [x] **Reconnexion automatique** du direct (3 essais), mémoire tampon réglable
 
-**Réglages** (par rubriques sur grand écran : Lecture, Affichage, Filtres, Réseau, Comptes, Données, À propos) : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
+**Réglages** (par rubriques sur grand écran : Lecture, Affichage, Guide TV, Filtres, Contrôle parental, Réseau, Comptes, Données, À propos) : couleur du curseur de la télécommande (jaune, orange, blanc, cyan), démarrage sur la dernière chaîne, tampon, format par défaut, paysage, image dans l'image, programme dans les listes,
 masquage des catégories adultes, effacement de l'historique.
 
 **À venir** : grille du guide TV sur plusieurs heures, contrôle parental par code.

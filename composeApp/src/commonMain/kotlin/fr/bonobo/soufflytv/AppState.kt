@@ -1,5 +1,7 @@
 package fr.bonobo.soufflytv
 
+import fr.bonobo.soufflytv.data.ParentalLock
+import fr.bonobo.soufflytv.data.ParentalControl
 import kotlinx.coroutines.delay
 import fr.bonobo.soufflytv.data.ReminderStore
 import fr.bonobo.soufflytv.data.Reminder
@@ -36,7 +38,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-data class ImportSummary(val added: Int, val updated: Int)
+/** Restauration : comptes ajoutés / mis à jour, et [full] si favoris, historique et réglages ont suivi. */
+data class ImportSummary(val added: Int, val updated: Int, val full: Boolean = false)
 
 sealed interface Screen {
     data object Sources : Screen
@@ -62,8 +65,10 @@ class AppState {
 
     val library = LibraryStore(scope)
     val settings = SettingsStore(scope)
-    /** Rappels posés depuis le guide TV. */
-    val reminders = ReminderStore(scope)
+    /** Rappels posés depuis le guide TV (prévenir N minutes avant, selon les réglages). */
+    val reminders = ReminderStore(scope, leadMs = { settings.value.reminderMinutes * 60_000L })
+    /** Contrôle parental (code PIN). */
+    val parental = ParentalControl(settings)
 
     /** Rappel dont l'émission commence : bandeau « Ça commence » affiché par-dessus l'écran. */
     var dueReminder by mutableStateOf<Reminder?>(null)
@@ -120,7 +125,8 @@ class AppState {
             val now = nowMillis()
             reminders.cleanup(now)
             if (dueReminder == null) {
-                dueReminder = reminders.reminders.firstOrNull { now >= it.start - 60_000 && now < it.stop }
+                val lead = settings.value.reminderMinutes * 60_000L
+                dueReminder = reminders.reminders.firstOrNull { now >= it.start - lead && now < it.stop }
             }
             delay(15_000)
         }
@@ -154,9 +160,30 @@ class AppState {
 
     // ---------- Navigation ----------
 
+    /** Ouvre un écran ; réglages et comptes demandent le code PIN si le contrôle parental les protège. */
     fun navigate(target: Screen) {
+        when (target) {
+            Screen.Settings -> parental.guard(ParentalLock.SETTINGS, "Ouvrir les réglages") { go(target) }
+            is Screen.ManageCategories -> parental.guard(ParentalLock.SETTINGS, "Modifier les filtres") { go(target) }
+            is Screen.AddSource -> parental.guard(ParentalLock.ACCOUNTS, "Ajouter ou modifier un compte") { go(target) }
+            else -> go(target)
+        }
+    }
+
+    private fun go(target: Screen) {
         backStack += screen
         screen = target
+    }
+
+    /**
+     * Après un changement du guide TV (décalage, mise à jour) : les fournisseurs sont recréés,
+     * le guide est relu (avec les nouvelles heures) au prochain affichage.
+     */
+    fun reloadGuides(clearCache: Boolean) {
+        val ids = providers.keys.toList()
+        providers.clear()
+        browsers.clear()
+        if (clearCache) scope.launch { ids.forEach { EpgCache.delete(it) } }
     }
 
     /** @return false s'il n'y a plus rien en arrière (l'application peut se fermer). */
@@ -208,7 +235,7 @@ class AppState {
 
     fun browser(source: Source): BrowserModel {
         val provider = provider(source)
-        return browsers.getOrPut(source.id) { BrowserModel(provider, scope, source.id, library, settings) }
+        return browsers.getOrPut(source.id) { BrowserModel(provider, scope, source.id, library, settings, parental) }
     }
 
     /** Teste une source avant enregistrement ; garde la connexion pour éviter un second téléchargement. */
@@ -242,12 +269,20 @@ class AppState {
     // ---------- Sauvegarde des comptes ----------
 
     /** Fichier chiffré contenant toutes les sources (et les playlists importées depuis un fichier). */
-    suspend fun exportAccounts(password: String): String {
+    suspend fun exportAccounts(password: String, full: Boolean = false): String {
         val list = sources.value
         val playlists = list.filterIsInstance<Source.M3u>()
             .mapNotNull { m3u -> m3u.localFile?.let { file -> readAppFile(file)?.let { file to it } } }
             .toMap()
-        val backup = AccountBackup(exportedAt = nowMillis(), sources = list, playlists = playlists)
+        // Sauvegarde complète : favoris, historique, filtres, rappels et réglages (sans le code parental)
+        val backup = AccountBackup(
+            exportedAt = nowMillis(),
+            sources = list,
+            playlists = playlists,
+            library = if (full) library.snapshot() else null,
+            settings = if (full) settings.value.copy(parental = false, pinHash = "") else null,
+            reminders = if (full) reminders.reminders else emptyList(),
+        )
         return withContext(Dispatchers.Default) { AccountBackupCodec.encode(backup, password) }
     }
 
@@ -261,7 +296,29 @@ class AppState {
         val existing = sources.value.map { it.id }.toSet()
         val updated = backup.sources.count { it.id in existing }
         repository.saveAll(backup.sources)
-        return ImportSummary(added = backup.sources.size - updated, updated = updated)
+        // Sauvegarde complète : on ajoute favoris, historique, rappels… et on reprend les réglages,
+        // sauf ceux propres à cet appareil (taille du texte, AFR, DNS, plein écran…) et le contrôle parental
+        backup.library?.let { library.merge(it) }
+        reminders.merge(backup.reminders, nowMillis())
+        backup.settings?.let { saved ->
+            settings.update { current ->
+                saved.copy(
+                    parental = current.parental,
+                    pinHash = current.pinHash,
+                    lockAdult = current.lockAdult,
+                    lockSettings = current.lockSettings,
+                    lockAccounts = current.lockAccounts,
+                    textSize = current.textSize,
+                    autoFrameRate = current.autoFrameRate,
+                    autoLandscape = current.autoLandscape,
+                    autoPip = current.autoPip,
+                    autoFullscreen = current.autoFullscreen,
+                    dns = current.dns,
+                )
+            }
+        }
+        val full = backup.library != null || backup.settings != null
+        return ImportSummary(added = backup.sources.size - updated, updated = updated, full = full)
     }
 
     /** Sauvegarde déposée en ligne (pratique pour une TV sans explorateur de fichiers). */

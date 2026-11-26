@@ -137,7 +137,8 @@ fun parseXmltvTime(value: String): Long? {
         val offset = h * 3_600L + m * 60L
         epochSeconds -= if (zone[0] == '+') offset else -offset
     }
-    return epochSeconds * 1000L
+    // décalage choisi dans les réglages (guide d'un fournisseur en avance ou en retard)
+    return epochSeconds * 1000L + EpgPrefs.offsetMs
 }
 
 /** Nombre de jours depuis le 1er janvier 1970 (algorithme de Howard Hinnant). */

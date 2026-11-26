@@ -26,6 +26,7 @@ import fr.bonobo.soufflytv.ui.theme.Cm
 import fr.bonobo.soufflytv.ui.theme.SoufflyTheme
 import fr.bonobo.soufflytv.ui.DialogLayer
 import fr.bonobo.soufflytv.ui.ReminderBanner
+import fr.bonobo.soufflytv.ui.ParentalPromptHost
 import fr.bonobo.soufflytv.ui.LocalDialogHost
 import androidx.compose.runtime.CompositionLocalProvider
 
@@ -38,7 +39,10 @@ fun App(state: AppState) {
             .components { add(KtorNetworkFetcherFactory(httpClient = { createHttpClient() })) }
             .build()
     }
-    SoufflyTheme(focusColor = Color(state.settings.value.focusColor.argb)) {
+    SoufflyTheme(
+        focusColor = Color(state.settings.value.focusColor.argb),
+        textScale = state.settings.value.textSize.scale,
+    ) {
         Surface(Modifier.fillMaxSize(), color = Cm.Background) {
           CompositionLocalProvider(LocalDialogHost provides state.dialogs) {
            Box(Modifier.fillMaxSize()) {
@@ -59,6 +63,8 @@ fun App(state: AppState) {
             }
             // Rappel du guide TV : « Ça commence », par-dessus tout l'écran
             ReminderBanner(state)
+            // Contrôle parental : demande du code (catégorie adulte, réglages, comptes)
+            ParentalPromptHost(state)
             // Ordinateur : dialogues dessinés par-dessus tout l'écran
             DialogLayer(state.dialogs)
            }

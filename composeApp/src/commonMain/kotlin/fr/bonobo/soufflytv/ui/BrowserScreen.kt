@@ -473,9 +473,11 @@ private fun CategoryPane(model: BrowserModel, modifier: Modifier) {
         }
         items(model.categories) { category ->
             val selected = category.id == model.selected?.id
-            val icon = when (category.id) {
-                FAVORITES -> AppIcons.Star
-                RECENTS -> AppIcons.History
+            val icon = when {
+                category.id == FAVORITES -> AppIcons.Star
+                category.id == RECENTS -> AppIcons.History
+                // contrôle parental : le code PIN sera demandé
+                model.isLocked(category) -> AppIcons.Lock
                 else -> null
             }
             Row(

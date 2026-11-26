@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.bonobo.soufflytv.AppState
 import fr.bonobo.soufflytv.platform.formatClock
+import fr.bonobo.soufflytv.platform.nowMillis
 import fr.bonobo.soufflytv.ui.theme.Cm
 import kotlinx.coroutines.delay
 
@@ -55,7 +56,13 @@ fun ReminderBanner(state: AppState) {
                 .border(2.dp, Cm.Cyan, RoundedCornerShape(16.dp))
                 .padding(16.dp),
         ) {
-            Text("⏰ ÇA COMMENCE", color = Cm.Cyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            val minutesLeft = ((reminder.start - nowMillis()) / 60_000).toInt()
+            Text(
+                if (minutesLeft >= 1) "⏰ DANS $minutesLeft MIN" else "⏰ ÇA COMMENCE",
+                color = Cm.Cyan,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
             Spacer(Modifier.height(4.dp))
             Text(reminder.title, color = Cm.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text("Sur ${reminder.channelName} à ${formatClock(reminder.start)}", color = Cm.TextMuted, fontSize = 14.sp)

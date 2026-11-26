@@ -31,7 +31,7 @@ data class Reminder(
 private data class ReminderFile(val reminders: List<Reminder> = emptyList())
 
 /** Rappels enregistrés (reminders.json) ; sur Android, une notification est aussi programmée. */
-class ReminderStore(private val scope: CoroutineScope) {
+class ReminderStore(private val scope: CoroutineScope, private val leadMs: () -> Long) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -54,8 +54,18 @@ class ReminderStore(private val scope: CoroutineScope) {
     fun add(reminder: Reminder) {
         if (reminders.any { it.key == reminder.key }) return
         reminders = (reminders + reminder).sortedBy { it.start }
-        runCatching { scheduleReminderNotification(reminder) }
+        runCatching { scheduleReminderNotification(reminder, leadMs()) }
         save()
+    }
+
+    /** Délai des rappels changé : les notifications déjà programmées sont recalées. */
+    fun rescheduleAll() {
+        reminders.forEach { r -> runCatching { scheduleReminderNotification(r, leadMs()) } }
+    }
+
+    /** Sauvegarde restaurée : ajoute les rappels à venir qui n'existent pas encore. */
+    fun merge(others: List<Reminder>, now: Long) {
+        others.filter { it.stop > now && reminders.none { r -> r.key == it.key } }.forEach { add(it) }
     }
 
     fun remove(reminder: Reminder) {

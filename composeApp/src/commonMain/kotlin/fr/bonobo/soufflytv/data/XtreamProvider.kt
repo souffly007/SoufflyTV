@@ -384,7 +384,7 @@ class XtreamProvider(
     /** Télécharge le guide complet s'il manque ou a plus de 6 h, puis l'enregistre. */
     override suspend fun preloadEpg(): Unit = xmltvMutex.withLock {
         val now = nowMillis()
-        if (xmltv != null && now - xmltvSavedAt < EpgCache.REFRESH_MS) return@withLock
+        if (xmltv != null && now - xmltvSavedAt < EpgCache.refreshMs) return@withLock
         val channels = try {
             channels(Section.LIVE, null)
         } catch (e: CancellationException) {
@@ -420,7 +420,7 @@ class XtreamProvider(
             EpgCache.save(source.id, now, map)
         } else {
             if (xmltv == null) xmltv = emptyMap()
-            xmltvSavedAt = now - EpgCache.REFRESH_MS + 30 * MINUTE_MS // nouvel essai dans 30 min
+            xmltvSavedAt = now - EpgCache.refreshMs + 30 * MINUTE_MS // nouvel essai dans 30 min
         }
         Unit
     }
@@ -453,8 +453,8 @@ class XtreamProvider(
         }
         val listings = (json as? JsonObject)?.get("epg_listings").asObjects()
         val fromTable = listings.mapNotNull { o ->
-            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000) ?: return@mapNotNull null
-            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000) ?: (start + HOUR_MS)
+            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000)?.plus(EpgPrefs.offsetMs) ?: return@mapNotNull null
+            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000)?.plus(EpgPrefs.offsetMs) ?: (start + HOUR_MS)
             val title = decodeBase64OrRaw(o.s("title")) ?: return@mapNotNull null
             val archived = o.s("has_archive")
             val programme = Programme(start, stop, title, decodeBase64OrRaw(o.s("description")))
@@ -487,8 +487,8 @@ class XtreamProvider(
             return emptyList()
         }
         val list = (json as? JsonObject)?.get("epg_listings").asObjects().mapNotNull { o ->
-            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000) ?: return@mapNotNull null
-            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000) ?: (start + HOUR_MS)
+            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000)?.plus(EpgPrefs.offsetMs) ?: return@mapNotNull null
+            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000)?.plus(EpgPrefs.offsetMs) ?: (start + HOUR_MS)
             val title = decodeBase64OrRaw(o.s("title")) ?: return@mapNotNull null
             Programme(start, stop, title, decodeBase64OrRaw(o.s("description")))
         }.sortedBy { it.start }

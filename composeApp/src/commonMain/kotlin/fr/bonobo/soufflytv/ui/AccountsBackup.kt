@@ -78,15 +78,16 @@ fun AccountsBackupSection(state: AppState) {
     }
 
     Text(
-        "Garde une copie chiffrée de tes comptes (M3U, Xtream, portails MAC) pour les retrouver " +
-            "après une réinstallation ou les copier sur un autre appareil.",
+        "Garde une copie chiffrée de tes comptes (M3U, Xtream, portails MAC) — et, si tu veux, de tes favoris, " +
+            "historique, filtres, rappels et réglages — pour tout retrouver après une réinstallation " +
+            "ou passer d'un appareil à l'autre.",
         color = Cm.TextMuted,
         fontSize = 12.sp,
         modifier = Modifier.padding(horizontal = 14.dp),
     )
     Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedButton(enabled = sources.isNotEmpty(), onClick = { open(BackupStep.Export) }) {
-            Text("Sauvegarder les comptes")
+            Text("Sauvegarder")
         }
         OutlinedButton(onClick = { open(BackupStep.ImportChoice) }) { Text("Restaurer") }
     }
@@ -103,6 +104,7 @@ fun AccountsBackupSection(state: AppState) {
         null -> Unit
 
         BackupStep.Export -> {
+            var full by remember { mutableStateOf(true) }
             var password by remember { mutableStateOf("") }
             var confirm by remember { mutableStateOf("") }
             val tooShort = password.length < AccountBackupCodec.MIN_PASSWORD_LENGTH
@@ -117,9 +119,9 @@ fun AccountsBackupSection(state: AppState) {
                     busy = true
                     scope.launch {
                         try {
-                            val content = state.exportAccounts(password)
+                            val content = state.exportAccounts(password, full)
                             open(null)
-                            saver(backupFileName(nowMillis()), content)
+                            saver(backupFileName(nowMillis(), full), content)
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Throwable) {
@@ -131,6 +133,26 @@ fun AccountsBackupSection(state: AppState) {
                 },
                 onDismiss = { open(null) },
             ) {
+                // Sauvegarde complète ou comptes seulement
+                Row(
+                    Modifier.fillMaxWidth().tvClickable { full = !full }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = full,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(checkedColor = Cm.Cyan, checkmarkColor = Cm.OnCyan),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text("Sauvegarde complète", color = Cm.Text, fontSize = 14.sp)
+                        Text(
+                            "Avec favoris, historique et reprises, filtres, rappels et réglages",
+                            color = Cm.TextMuted,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
                 Text(
                     "Choisis un mot de passe d'au moins ${AccountBackupCodec.MIN_PASSWORD_LENGTH} caractères. " +
                         "Il sera demandé pour restaurer : sans lui, la sauvegarde est illisible, même pour toi.",
@@ -155,7 +177,9 @@ fun AccountsBackupSection(state: AppState) {
             onDismiss = { open(null) },
         ) {
             Text(
-                "Les comptes de la sauvegarde sont ajoutés à ceux déjà présents ; un compte déjà présent est mis à jour.",
+                "Les comptes de la sauvegarde sont ajoutés à ceux déjà présents ; un compte déjà présent est mis à jour. " +
+                    "Une sauvegarde complète ajoute aussi favoris, historique, filtres et rappels, et reprend les réglages " +
+                    "(sauf ceux propres à cet appareil).",
                 color = Cm.TextMuted,
                 fontSize = 13.sp,
             )
@@ -235,6 +259,7 @@ fun AccountsBackupSection(state: AppState) {
                                     append(" (${summary.added} ajouté${if (summary.added > 1) "s" else ""}, ")
                                     append("${summary.updated} mis à jour)")
                                 }
+                                if (summary.full) append(", avec favoris, historique, filtres, rappels et réglages")
                             } to false
                         } catch (e: CancellationException) {
                             throw e

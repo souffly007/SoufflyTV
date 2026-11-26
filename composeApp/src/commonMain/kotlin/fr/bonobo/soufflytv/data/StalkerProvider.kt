@@ -493,8 +493,8 @@ class StalkerProvider(
         replayCache[chId]?.let { (time, list) -> if (nowMillis() - time < 10 * MINUTE_MS) return list }
         val now = nowMillis()
         fun parse(items: List<JsonObject>) = items.mapNotNull { o ->
-            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000) ?: return@mapNotNull null
-            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000) ?: (start + HOUR_MS)
+            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000)?.plus(EpgPrefs.offsetMs) ?: return@mapNotNull null
+            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000)?.plus(EpgPrefs.offsetMs) ?: (start + HOUR_MS)
             val title = o.s("name") ?: return@mapNotNull null
             val archived = o.s("mark_archive")
             Programme(start, stop, title, o.s("descr"), id = o.s("id"))
@@ -555,8 +555,8 @@ class StalkerProvider(
         }
         val items = if (js is JsonObject && js["data"] != null) js["data"].asObjects() else js.asObjects()
         val list = items.mapNotNull { o ->
-            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000) ?: return@mapNotNull null
-            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000) ?: (start + HOUR_MS)
+            val start = o.s("start_timestamp")?.toLongOrNull()?.times(1000)?.plus(EpgPrefs.offsetMs) ?: return@mapNotNull null
+            val stop = o.s("stop_timestamp")?.toLongOrNull()?.times(1000)?.plus(EpgPrefs.offsetMs) ?: (start + HOUR_MS)
             Programme(start, stop, o.s("name") ?: return@mapNotNull null, o.s("descr"))
         }.sortedBy { it.start }
         epgCache[chId] = nowMillis() to list

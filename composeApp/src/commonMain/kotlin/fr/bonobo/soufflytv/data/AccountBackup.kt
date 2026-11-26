@@ -27,6 +27,13 @@ data class AccountBackup(
     val sources: List<Source>,
     /** Playlists M3U importées depuis un fichier : nom du fichier interne → contenu. */
     val playlists: Map<String, String> = emptyMap(),
+    /**
+     * Sauvegarde complète seulement : favoris, historique, reprises, catégories masquées, rappels, réglages.
+     * (Absents d'une sauvegarde « comptes seulement » ; ignorés par les versions plus anciennes.)
+     */
+    val library: LibraryFile? = null,
+    val settings: Settings? = null,
+    val reminders: List<Reminder> = emptyList(),
 )
 
 @Serializable
@@ -114,12 +121,12 @@ object AccountBackupCodec {
     }
 }
 
-/** « SoufflyTV-comptes-2026-11-19.json » */
-fun backupFileName(epochMillis: Long): String {
+/** « SoufflyTV-comptes-2026-11-19.json », ou « SoufflyTV-sauvegarde-… » pour une sauvegarde complète. */
+fun backupFileName(epochMillis: Long, full: Boolean = false): String {
     val days = epochMillis.floorDiv(86_400_000L)
     val (year, month, day) = civilFromDays(days)
     fun two(n: Int) = n.toString().padStart(2, '0')
-    return "SoufflyTV-comptes-$year-${two(month)}-${two(day)}.json"
+    return "SoufflyTV-${if (full) "sauvegarde" else "comptes"}-$year-${two(month)}-${two(day)}.json"
 }
 
 /** Jour depuis le 1er janvier 1970 → (année, mois, jour), calendrier grégorien. */

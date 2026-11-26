@@ -1,5 +1,6 @@
 package fr.bonobo.soufflytv.ui
 
+import fr.bonobo.soufflytv.data.TextSize
 import fr.bonobo.soufflytv.Screen
 import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -139,6 +140,23 @@ fun SettingsScreen(state: AppState) {
 
     }
     val affichage: @Composable () -> Unit = {
+                Text("Taille du texte", color = Cm.Text, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 14.dp))
+                Text(
+                    "Pour une petite TV ou une TV vue de loin : tous les textes de SoufflyTV grandissent ou rapetissent",
+                    color = Cm.TextMuted,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                )
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextSize.entries.forEach { size ->
+                        Pill(size.label, selected = settings.textSize == size) {
+                            state.settings.update { it.copy(textSize = size) }
+                        }
+                    }
+                }
                 Text(
                     "Couleur du curseur",
                     color = Cm.Text,
@@ -181,6 +199,12 @@ fun SettingsScreen(state: AppState) {
     val filtres: @Composable () -> Unit = {
                 FiltersSection(state)
     }
+    val guide: @Composable () -> Unit = {
+                GuideSettingsSection(state)
+    }
+    val parentalRubric: @Composable () -> Unit = {
+                ParentalSection(state)
+    }
     val comptes: @Composable () -> Unit = {
                 AccountsBackupSection(state)
     }
@@ -203,7 +227,9 @@ fun SettingsScreen(state: AppState) {
     val rubrics = listOf(
         SettingsRubric("Lecture", AppIcons.Play, lecture),
         SettingsRubric("Affichage", AppIcons.Aspect, affichage),
+        SettingsRubric("Guide TV", AppIcons.Guide, guide),
         SettingsRubric("Filtres", AppIcons.Filter, filtres),
+        SettingsRubric("Contrôle parental", AppIcons.Lock, parentalRubric),
         SettingsRubric("Réseau", AppIcons.Dns, reseau),
         SettingsRubric("Comptes", AppIcons.Library, comptes),
         SettingsRubric("Données", AppIcons.History, donnees),
@@ -432,5 +458,192 @@ private fun FiltersSection(state: AppState) {
                 }
             }
         }
+    }
+}
+
+/** « Aucun », « +1 h », « −30 min », « +1 h 30 ». */
+private fun offsetLabel(minutes: Int): String {
+    if (minutes == 0) return "Aucun"
+    val sign = if (minutes > 0) "+" else "−"
+    val m = kotlin.math.abs(minutes)
+    return when {
+        m < 60 -> "$sign$m min"
+        m % 60 == 0 -> "$sign${m / 60} h"
+        else -> "$sign${m / 60} h ${(m % 60).toString().padStart(2, '0')}"
+    }
+}
+
+/** Guide TV : décalage horaire, fréquence de mise à jour, et délai des rappels. */
+@Composable
+private fun GuideSettingsSection(state: AppState) {
+    val settings = state.settings.value
+    var notice by remember { mutableStateOf<String?>(null) }
+
+    Text("Décalage horaire du guide", color = Cm.Text, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 14.dp))
+    Text(
+        "Si les émissions du guide sont en avance ou en retard sur ce qui passe vraiment (fournisseur réglé sur un autre fuseau)",
+        color = Cm.TextMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 14.dp),
+    )
+    fun setOffset(minutes: Int) {
+        state.settings.update { it.copy(epgOffsetMinutes = minutes.coerceIn(-12 * 60, 12 * 60)) }
+        // les guides sont relus avec les nouvelles heures
+        state.reloadGuides(clearCache = false)
+    }
+    Row(
+        Modifier.padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedButton(onClick = { setOffset(settings.epgOffsetMinutes - 30) }) { Text("− 30 min", color = Cm.Text) }
+        Text(
+            offsetLabel(settings.epgOffsetMinutes),
+            color = if (settings.epgOffsetMinutes == 0) Cm.TextMuted else Cm.Cyan,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(90.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        OutlinedButton(onClick = { setOffset(settings.epgOffsetMinutes + 30) }) { Text("+ 30 min", color = Cm.Text) }
+        if (settings.epgOffsetMinutes != 0) {
+            OutlinedButton(onClick = { setOffset(0) }) { Text("Remettre à zéro", color = Cm.Text) }
+        }
+    }
+
+    Text("Mise à jour du guide", color = Cm.Text, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 14.dp))
+    Text(
+        "Le guide enregistré s'affiche tout de suite ; il est retéléchargé en arrière-plan à cet intervalle",
+        color = Cm.TextMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 14.dp),
+    )
+    Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(6, 12, 24).forEach { hours ->
+            Pill("Toutes les $hours h", selected = settings.epgRefreshHours == hours) {
+                state.settings.update { it.copy(epgRefreshHours = hours) }
+            }
+        }
+    }
+    OutlinedButton(
+        onClick = {
+            state.reloadGuides(clearCache = true)
+            notice = "Le guide sera retéléchargé à l'ouverture de chaque compte"
+        },
+        modifier = Modifier.padding(horizontal = 14.dp),
+    ) { Text("Mettre à jour le guide maintenant") }
+    notice?.let { Text(it, color = Cm.Success, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) }
+
+    Spacer(Modifier.height(12.dp))
+    Text("Rappels", color = Cm.Text, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 14.dp))
+    Text(
+        "Quand prévenir avant le début d'une émission (bandeau dans l'appli, notification sur smartphone)",
+        color = Cm.TextMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 14.dp),
+    )
+    Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(1, 2, 5, 10).forEach { minutes ->
+            Pill("$minutes min avant", selected = settings.reminderMinutes == minutes) {
+                state.settings.update { it.copy(reminderMinutes = minutes) }
+                state.reminders.rescheduleAll()
+            }
+        }
+    }
+}
+
+/** Contrôle parental : code PIN et ce qu'il protège. */
+@Composable
+private fun ParentalSection(state: AppState) {
+    val settings = state.settings.value
+    val parental = state.parental
+    // Choix d'un code : null = rien ; "" = saisie du nouveau code ; sinon = confirmation de ce code
+    var setup by remember { mutableStateOf<String?>(null) }
+    var setupError by remember { mutableStateOf<String?>(null) }
+
+    Text(
+        "Un code à 4 chiffres protège les catégories adultes, les réglages et les comptes. " +
+            "Une fois saisi, plus rien n'est demandé jusqu'à la fermeture de SoufflyTV.",
+        color = Cm.TextMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 14.dp),
+    )
+    if (!parental.enabled) {
+        OutlinedButton(
+            onClick = {
+                setup = ""
+                setupError = null
+            },
+            modifier = Modifier.padding(14.dp),
+        ) {
+            Icon(AppIcons.Lock, contentDescription = null, tint = Cm.Cyan, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Activer : choisir un code", color = Cm.Text)
+        }
+    } else {
+        Text(
+            if (parental.unlocked) "Actif · déverrouillé jusqu'à la fermeture de l'appli" else "Actif · verrouillé",
+            color = Cm.Cyan,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+        )
+        SwitchRow(
+            "Catégories adultes",
+            "Affichées avec un cadenas ; le code est demandé pour les ouvrir. Cachées ailleurs (accueil, recherche, guide) tant que c'est verrouillé",
+            settings.lockAdult,
+        ) { v -> state.settings.update { it.copy(lockAdult = v) } }
+        SwitchRow("Réglages", "Le code est demandé pour ouvrir les réglages et les filtres", settings.lockSettings) { v ->
+            state.settings.update { it.copy(lockSettings = v) }
+        }
+        SwitchRow("Comptes", "Le code est demandé pour ajouter, modifier ou supprimer un compte", settings.lockAccounts) { v ->
+            state.settings.update { it.copy(lockAccounts = v) }
+        }
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedButton(onClick = { parental.lockNow() }) { Text("Verrouiller maintenant", color = Cm.Text) }
+            OutlinedButton(onClick = {
+                parental.ask("Code actuel, pour en choisir un nouveau") {
+                    setup = ""
+                    setupError = null
+                }
+            }) { Text("Changer le code", color = Cm.Text) }
+            OutlinedButton(onClick = { parental.ask("Désactiver le contrôle parental") { parental.disable() } }) {
+                Text("Désactiver", color = Cm.Text)
+            }
+        }
+        Text(
+            "Code oublié : efface les données de SoufflyTV (Android : Paramètres → Applications → SoufflyTV → Stockage). " +
+                "Les comptes seront à remettre : pense à faire une sauvegarde.",
+            color = Cm.TextMuted,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 14.dp),
+        )
+    }
+
+    setup?.let { first ->
+        PinDialog(
+            title = if (first.isEmpty()) "Nouveau code parental" else "Confirme le code",
+            subtitle = if (first.isEmpty()) "4 chiffres, à bien retenir" else "Tape-le une seconde fois",
+            error = setupError,
+            onDismiss = { setup = null },
+            onComplete = { code ->
+                when {
+                    first.isEmpty() -> {
+                        setup = code
+                        setupError = null
+                    }
+                    code == first -> {
+                        parental.setPin(code)
+                        setup = null
+                    }
+                    else -> {
+                        setup = ""
+                        setupError = "Les deux codes sont différents : recommence"
+                    }
+                }
+            },
+        )
     }
 }

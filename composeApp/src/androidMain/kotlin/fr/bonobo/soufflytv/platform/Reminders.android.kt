@@ -19,7 +19,7 @@ import fr.bonobo.soufflytv.data.Reminder
 import java.lang.ref.WeakReference
 
 /*
- * Rappels du guide TV sur Android : une alarme 2 minutes avant l'émission affiche une notification
+ * Rappels du guide TV sur Android : une alarme quelques minutes avant l'émission (réglage) affiche une notification
  * (« Ça commence : … sur TF1 à 16:00 »). Un appui ouvre SoufflyTV, qui propose de lancer la chaîne.
  * Sur Android TV, les notifications sont peu visibles : le rappel s'affiche aussi dans l'appli si elle est ouverte.
  */
@@ -28,7 +28,6 @@ private const val CHANNEL_ID = "rappels"
 private const val EXTRA_TITLE = "titre"
 private const val EXTRA_TEXT = "texte"
 private const val EXTRA_ID = "id"
-private const val NOTICE_MS = 2 * 60_000L
 
 /** Activité en cours (pour demander l'autorisation des notifications). */
 object ReminderPermission {
@@ -51,7 +50,7 @@ private fun alarmIntent(context: Context, reminder: Reminder): PendingIntent {
     )
 }
 
-actual fun scheduleReminderNotification(reminder: Reminder) {
+actual fun scheduleReminderNotification(reminder: Reminder, leadMs: Long) {
     val context = AndroidApp.context
     // Android 13+ : autorisation des notifications, demandée au premier rappel
     if (Build.VERSION.SDK_INT >= 33 &&
@@ -62,7 +61,7 @@ actual fun scheduleReminderNotification(reminder: Reminder) {
         }
     }
     val alarms = context.getSystemService(AlarmManager::class.java) ?: return
-    val at = (reminder.start - NOTICE_MS).coerceAtLeast(System.currentTimeMillis() + 5_000)
+    val at = (reminder.start - leadMs).coerceAtLeast(System.currentTimeMillis() + 5_000)
     // alarme non exacte (pas d'autorisation spéciale) : quelques secondes d'écart au plus en temps normal
     alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, alarmIntent(context, reminder))
 }

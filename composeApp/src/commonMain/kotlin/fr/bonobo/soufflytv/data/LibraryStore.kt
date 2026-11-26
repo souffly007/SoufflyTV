@@ -23,8 +23,9 @@ data class LibraryEntry(
     val at: Long,
 )
 
+/** Contenu de la bibliothèque (fichier library.json, et sauvegarde complète). */
 @Serializable
-internal data class LibraryFile(
+data class LibraryFile(
     val favorites: List<LibraryEntry> = emptyList(),
     val recents: List<LibraryEntry> = emptyList(),
     /** Position de reprise des films/épisodes : "sourceId|channelId" → ms. */
@@ -185,20 +186,46 @@ class LibraryStore(private val scope: CoroutineScope) {
         scheduleSave()
     }
 
+    /** Copie de toute la bibliothèque (sauvegarde complète). */
+    fun snapshot(): LibraryFile = LibraryFile(
+        favorites = favorites,
+        recents = recents,
+        positions = positions.toMap(),
+        hidden = hidden.toList(),
+        durations = durations.toMap(),
+        watched = watched.toList(),
+        lastPlayed = lastPlayed.toMap(),
+    )
+
+    /**
+     * Restauration d'une sauvegarde complète : on ajoute sans rien perdre (favoris, historique,
+     * catégories masquées, films et épisodes vus) ; pour une reprise, la plus récente l'emporte.
+     */
+    fun merge(other: LibraryFile) {
+        favorites = (favorites + other.favorites).distinctBy { it.sourceId to it.channel.id }
+        recents = (recents + other.recents).sortedByDescending { it.at }
+            .distinctBy { it.sourceId to it.channel.id }
+            .take(MAX_RECENTS)
+        other.lastPlayed.forEach { (key, at) ->
+            if (at >= (lastPlayed[key] ?: 0L)) {
+                lastPlayed[key] = at
+                val position = other.positions[key]
+                if (position != null) positions[key] = position else positions.remove(key)
+            }
+        }
+        other.positions.forEach { (key, position) -> if (key !in other.lastPlayed) positions.getOrPut(key) { position } }
+        other.durations.forEach { (key, duration) -> durations.getOrPut(key) { duration } }
+        watched = watched + other.watched
+        hidden = hidden + other.hidden
+        progressVersion++
+        scheduleSave()
+    }
+
     private fun scheduleSave() {
         saveJob?.cancel()
         saveJob = scope.launch {
             delay(400)
-            val data = LibraryFile(
-                favorites = favorites,
-                recents = recents,
-                positions = positions.toMap(),
-                hidden = hidden.toList(),
-                durations = durations.toMap(),
-                watched = watched.toList(),
-                lastPlayed = lastPlayed.toMap(),
-            )
-            writeAppFile(FILE, json.encodeToString(LibraryFile.serializer(), data))
+            writeAppFile(FILE, json.encodeToString(LibraryFile.serializer(), snapshot()))
         }
     }
 

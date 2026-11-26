@@ -44,7 +44,35 @@ data class Settings(
     val dns: DnsMode = DnsMode.SYSTEM,
     /** Guide TV : dernière qualité choisie (SD, HD, FHD, UHD…), proposée en premier la fois suivante. */
     val preferredQuality: String = "",
+    /** Contrôle parental : actif, empreinte du code PIN, et ce qu'il protège. */
+    val parental: Boolean = false,
+    val pinHash: String = "",
+    val lockAdult: Boolean = true,
+    val lockSettings: Boolean = true,
+    val lockAccounts: Boolean = true,
+    /** Taille du texte de toute l'interface. */
+    val textSize: TextSize = TextSize.NORMAL,
+    /** Guide TV : décalage horaire (minutes, ±) et fréquence de mise à jour (heures). */
+    val epgOffsetMinutes: Int = 0,
+    val epgRefreshHours: Int = 6,
+    /** Rappels : prévenir tant de minutes avant le début de l'émission. */
+    val reminderMinutes: Int = 2,
 )
+
+/** Taille du texte : petite TV, TV vue de loin, grand écran de PC… */
+enum class TextSize(val label: String, val scale: Float) {
+    SMALL("Petite", 0.9f),
+    NORMAL("Normale", 1f),
+    LARGE("Grande", 1.15f),
+    XLARGE("Très grande", 1.3f),
+}
+
+/** Applique les réglages lus par le reste de l'appli hors de l'interface (DNS, guide TV). */
+private fun applyGlobals(s: Settings) {
+    applyDnsMode(s.dns)
+    EpgPrefs.offsetMs = s.epgOffsetMinutes * 60_000L
+    EpgPrefs.refreshMs = s.epgRefreshHours.coerceIn(1, 48) * HOUR_MS
+}
 
 /**
  * DNS chiffré (DNS-over-HTTPS) : l'adresse des serveurs est demandée directement à Cloudflare,
@@ -85,12 +113,12 @@ class SettingsStore(private val scope: CoroutineScope) {
         } catch (e: Exception) {
             Settings()
         }
-        applyDnsMode(value.dns)
+        applyGlobals(value)
     }
 
     fun update(transform: (Settings) -> Settings) {
         value = transform(value)
-        applyDnsMode(value.dns)
+        applyGlobals(value)
         val snapshot = value
         scope.launch { writeAppFile(FILE, json.encodeToString(Settings.serializer(), snapshot)) }
     }

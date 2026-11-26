@@ -1,5 +1,7 @@
 package fr.bonobo.soufflytv.ui.theme
 
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -94,9 +96,12 @@ val LocalFocusColor = staticCompositionLocalOf { Color(0xFFFFD600) }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun SoufflyTheme(focusColor: Color = Color(0xFFFFD600), content: @Composable () -> Unit) {
+fun SoufflyTheme(focusColor: Color = Color(0xFFFFD600), textScale: Float = 1f, content: @Composable () -> Unit) {
+    // Taille du texte (réglage) : tous les textes en sp suivent, les marges et icônes ne bougent pas
+    val density = LocalDensity.current
     MaterialTheme(colorScheme = CyanogenScheme) {
         CompositionLocalProvider(
+            LocalDensity provides Density(density.density, density.fontScale * textScale),
             LocalFocusColor provides focusColor,
             LocalBringIntoViewSpec provides MinimalBringIntoView,
             // Boutons Material (Lecture, icônes du lecteur…) : fond bien visible quand ils ont le focus

@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.bonobo.soufflytv.AppState
+import fr.bonobo.soufflytv.data.ParentalLock
 import fr.bonobo.soufflytv.Screen
 import fr.bonobo.soufflytv.data.detail
 import fr.bonobo.soufflytv.data.kindLabel
@@ -111,7 +112,9 @@ fun SourcesScreen(state: AppState) {
                                 state.open(source)
                             },
                             onEdit = { state.navigate(Screen.AddSource(source)) },
-                            onDelete = { toDelete = source },
+                            onDelete = {
+                                state.parental.guard(ParentalLock.ACCOUNTS, "Supprimer « ${source.name} »") { toDelete = source }
+                            },
                         )
                     }
                 }

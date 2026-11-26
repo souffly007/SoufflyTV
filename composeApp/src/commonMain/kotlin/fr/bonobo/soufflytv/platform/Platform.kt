@@ -100,7 +100,7 @@ expect fun applyDnsMode(mode: fr.bonobo.soufflytv.data.DnsMode)
 /** Compare l'adresse de [host] donnée par le DNS de l'appareil et par [mode]. */
 expect suspend fun checkDns(host: String, mode: fr.bonobo.soufflytv.data.DnsMode): fr.bonobo.soufflytv.data.DnsCheck
 
-/** Android : notification à l'heure du rappel (2 min avant l'émission), même appli fermée. Ordinateur : rien. */
-expect fun scheduleReminderNotification(reminder: fr.bonobo.soufflytv.data.Reminder)
+/** Android : notification à l'heure du rappel (quelques minutes avant l'émission, selon les réglages), même appli fermée. Ordinateur : rien. */
+expect fun scheduleReminderNotification(reminder: fr.bonobo.soufflytv.data.Reminder, leadMs: Long)
 
 expect fun cancelReminderNotification(reminder: fr.bonobo.soufflytv.data.Reminder)
