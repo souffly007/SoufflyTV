@@ -246,7 +246,8 @@ fun SettingsScreen(state: AppState) {
                 var firstFocused by remember { mutableStateOf(false) }
                 KeepFocus(firstFocus, Unit, isFocused = { firstFocused })
                 Row(Modifier.fillMaxSize()) {
-                    Column(Modifier.width(250.dp).fillMaxHeight().padding(12.dp)) {
+                    // Rubriques : la colonne défile (petit écran, grand texte), le focus l'entraîne
+                    Column(Modifier.width(250.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(12.dp)) {
                         rubrics.forEachIndexed { i, rubric ->
                             Row(
                                 Modifier

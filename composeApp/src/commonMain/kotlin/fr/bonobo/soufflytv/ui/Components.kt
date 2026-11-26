@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -85,7 +87,7 @@ import fr.bonobo.soufflytv.ui.theme.MonoLabel
 
 /**
  * Élément cliquable lisible à la souris, au doigt et à la télécommande :
- * le focus (D-pad / Tab) est souligné par une bordure cyan.
+ * le focus (D-pad / Tab) est souligné par un cadre de la couleur du curseur.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -99,6 +101,12 @@ fun Modifier.tvClickable(
     val focused by interaction.collectIsFocusedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val focusColor = LocalFocusColor.current
+    // L'onde (ripple) ne sert qu'à l'appui : le focus a déjà son fond et son cadre. Sinon les deux
+    // s'additionnent et, avec un curseur blanc, le texte blanc devient illisible.
+    val presses = remember { MutableInteractionSource() }
+    LaunchedEffect(interaction) {
+        interaction.interactions.collect { if (it is PressInteraction) presses.emit(it) }
+    }
     val background = when {
         focused -> focusColor.copy(alpha = 0.22f)
         selected -> Cm.CyanGlow
@@ -116,9 +124,10 @@ fun Modifier.tvClickable(
         .background(background)
         .then(if (focused) Modifier.border(3.dp, focusColor, shape) else Modifier)
         .hoverable(interaction)
+        .indication(presses, LocalIndication.current)
         .combinedClickable(
             interactionSource = interaction,
-            indication = LocalIndication.current,
+            indication = null,
             onLongClick = onLongClick,
             onClick = onClick,
         )
