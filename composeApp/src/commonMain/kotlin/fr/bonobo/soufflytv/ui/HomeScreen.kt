@@ -71,11 +71,27 @@ fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Mod
 
     val library = state.library
     val playable = setOf(ItemType.MOVIE, ItemType.EPISODE)
+    // Une carte par film et une seule par série (son dernier épisode regardé, s'il est commencé)
     val continueItems = library.recents
         .filter { it.sourceId == source.id && it.channel.type in playable }
         .map { it.channel }
+        .distinctBy { item -> item.parentSeries?.let { "series|${it.id}" } ?: item.id }
         .filter { (library.position("${source.id}|${it.id}") ?: 0L) > 30_000 }
         .take(20)
+    // Carte choisie : la fiche de la série (sur le bon épisode) ou celle du film, comme dans l'Historique
+    fun openContinue(index: Int) {
+        val item = continueItems[index]
+        val series = item.parentSeries
+        when {
+            series != null -> state.openItem(source, listOf(series), 0)
+            item.type == ItemType.MOVIE -> {
+                val movies = continueItems.filter { it.type == ItemType.MOVIE }
+                state.openItem(source, movies, movies.indexOf(item))
+            }
+            // épisode d'un ancien historique, sans sa série : reprise directe
+            else -> state.play(source, continueItems, index)
+        }
+    }
     val liveRecents = library.recents.filter { it.sourceId == source.id && it.channel.type == ItemType.LIVE }
         .map { it.channel }.take(20)
     val myList = library.favorites
@@ -155,6 +171,7 @@ fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Mod
                     progress = library.progress("${source.id}|${item.id}"),
                     position = library.position("${source.id}|${item.id}"),
                     onSeeAll = { model.openExtra(ExtraPage.HISTORY) },
+                    onOpen = { openContinue(0) },
                     onContinue = { state.play(source, continueItems, 0) },
                     onRestart = {
                         library.setPosition("${source.id}|${item.id}", 0)
@@ -170,9 +187,8 @@ fun HomePage(state: AppState, source: Source, model: BrowserModel, modifier: Mod
                             position = library.position("${source.id}|${item.id}"),
                             modifier = cardModifier("continue", item),
                         ) {
-                            // reprise directe, là où l'on s'était arrêté
                             model.homeReturnKey = "continue|${item.id}"
-                            state.play(source, continueItems, i)
+                            openContinue(i)
                         }
                     }
                 }
@@ -392,10 +408,10 @@ private fun ContinueCard(item: Channel, progress: Float?, position: Long?, modif
             }
         }
         Spacer(Modifier.height(6.dp))
-        Text(item.name, color = Cm.Text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(continueTitle(item), color = Cm.Text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             listOfNotNull(
-                if (item.type == ItemType.EPISODE) "ÉPISODE" else "FILM",
+                continueKind(item),
                 progress?.let { "${(it * 100).toInt()} %" },
                 position?.let { "arrêté à ${formatDuration(it)}" },
             ).joinToString(" · "),
@@ -417,4 +433,24 @@ internal fun LiveCard(item: Channel, modifier: Modifier, onClick: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         Text(item.name, color = Cm.Text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+}
+
+/** Titre d'une carte « Continuer à regarder » : le nom de la série pour un épisode, sinon le film. */
+internal fun continueTitle(item: Channel): String = item.parentSeries?.name ?: item.name
+
+/** « SÉRIE · S2 É5 », « ÉPISODE » (ancien historique) ou « FILM ». */
+internal fun continueKind(item: Channel): String = when {
+    item.parentSeries != null -> listOfNotNull("SÉRIE", episodeCode(item)).joinToString(" · ")
+    item.type == ItemType.EPISODE -> "ÉPISODE"
+    else -> "FILM"
+}
+
+private val EPISODE_CODE = Regex("""(?<![A-Za-z])[Ss](\d{1,2})\s*[ .x_-]?\s*[EeÉé](\d{1,3})(?!\d)""")
+
+/** Saison et épisode tirés du nom (« S02E05 », « S2 E5 »…), sinon le numéro d'épisode seul. */
+internal fun episodeCode(item: Channel): String? {
+    EPISODE_CODE.find(item.name)?.let { m ->
+        return "S${m.groupValues[1].toInt()} É${m.groupValues[2].toInt()}"
+    }
+    return item.number?.let { "É$it" }
 }

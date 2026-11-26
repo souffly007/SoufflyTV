@@ -189,6 +189,8 @@ internal fun PhoneContinueCard(
     progress: Float?,
     position: Long?,
     onSeeAll: () -> Unit,
+    /** Image ou titre touchés : fiche de la série (sur le bon épisode) ou du film. */
+    onOpen: () -> Unit,
     onContinue: () -> Unit,
     onRestart: () -> Unit,
 ) {
@@ -217,7 +219,7 @@ internal fun PhoneContinueCard(
         Row {
             Box(
                 Modifier.width(150.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(Cm.SurfaceHigher)
-                    .tvClickable(onClick = onContinue),
+                    .tvClickable(onClick = onOpen),
             ) {
                 if (item.logo != null) {
                     AsyncImage(item.logo, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -238,8 +240,9 @@ internal fun PhoneContinueCard(
                 }
             }
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.name, color = Cm.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.weight(1f).tvClickable(onClick = onOpen)) {
+                Text(continueTitle(item), color = Cm.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(continueKind(item), style = MonoLabel, color = Cm.Cyan)
                 Spacer(Modifier.height(4.dp))
                 remainingLabel(progress, position)?.let { Text(it, style = MonoLabel, color = Cm.TextMuted) }
             }
